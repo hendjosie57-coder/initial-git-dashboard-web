@@ -502,6 +502,42 @@ export const dependentsOf = (id: string): RepoFile[] =>
     .map((e) => REPO.files.find((f) => f.id === e.source))
     .filter((f): f is RepoFile => Boolean(f));
 
+/* --- Graph subset ------------------------------------------------------------
+   The node graph renders at most `max` files (10–12). Files are ranked by a
+   blend of connectivity (dependency degree) and recency of modification, so
+   the graph always surfaces the most load-bearing, most active modules. */
+
+export interface GraphSubset {
+  files: RepoFile[];
+  edges: DepEdge[];
+  totalFiles: number;
+}
+
+export function graphSubset(max = 12): GraphSubset {
+  const degree = new Map<string, number>();
+  for (const e of REPO.edges) {
+    degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
+    degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
+  }
+  const now = Date.now();
+  const files = [...REPO.files]
+    .map((f) => {
+      const deg = degree.get(f.id) ?? 0;
+      const ageDays = (now - new Date(f.lastModified).getTime()) / 86_400_000;
+      const recency = Math.max(0, 90 - ageDays) / 90; // 1 = touched today
+      return { f, score: deg + recency * 4 };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, max)
+    .map((s) => s.f);
+  const ids = new Set(files.map((f) => f.id));
+  return {
+    files,
+    edges: REPO.edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
+    totalFiles: REPO.files.length,
+  };
+}
+
 export function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.floor(diff / 86_400_000);

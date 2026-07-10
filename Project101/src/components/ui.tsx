@@ -1,32 +1,33 @@
 import type { ReactNode } from "react";
-import type { Author, Risk } from "../types";
-import { RISK_COLORS, RISK_LABELS } from "../lib/colors";
+import type { Author } from "../types";
+import { complexityBand, complexityColor, hexToRgba, RISK_LABELS } from "../lib/colors";
 
-/* Small shared presentational primitives. Flat, square, 1px borders. */
+/* Shared presentational primitives. Flat, minimal, sans-serif. */
 
 export function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-faint">
+    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
       {children}
     </div>
   );
 }
 
-export function RiskBadge({ risk }: { risk: Risk }) {
-  const color = RISK_COLORS[risk];
+/** Complexity chip: muted dot + band label, colored by the sage→terracotta ramp. */
+export function ComplexityBadge({ value }: { value: number }) {
+  const color = complexityColor(value);
+  const band = complexityBand(value);
   return (
-    <span className="inline-flex items-center gap-1.5 border border-edge bg-ink-2 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider">
-      <span className="h-2 w-2" style={{ background: color }} />
-      <span style={{ color }}>{RISK_LABELS[risk]}</span>
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+      style={{
+        color,
+        borderColor: hexToRgba(color, 0.35),
+        background: hexToRgba(color, 0.08),
+      }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+      {RISK_LABELS[band]} complexity · {value}
     </span>
-  );
-}
-
-export function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="border border-edge bg-ink-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
-      {children}
-    </kbd>
   );
 }
 
@@ -34,12 +35,13 @@ export function Avatar({ author, size = 24 }: { author: Author; size?: number })
   return (
     <div
       title={author.name}
-      className="flex shrink-0 items-center justify-center font-mono font-semibold text-obsidian"
+      className="flex shrink-0 items-center justify-center rounded-full font-semibold"
       style={{
         width: size,
         height: size,
         background: author.color,
-        fontSize: size * 0.38,
+        color: "#fcfcfb",
+        fontSize: size * 0.36,
       }}
     >
       {author.initials}
@@ -53,8 +55,8 @@ export function AvatarStack({ authors, size = 22 }: { authors: Author[]; size?: 
       {authors.map((a, i) => (
         <div
           key={a.id}
-          className="ring-2 ring-obsidian"
-          style={{ marginLeft: i === 0 ? 0 : -size * 0.32 }}
+          className="rounded-full ring-2 ring-paper"
+          style={{ marginLeft: i === 0 ? 0 : -size * 0.3 }}
         >
           <Avatar author={a} size={size} />
         </div>
@@ -74,23 +76,51 @@ export function SkeletonLines({ lines = 3 }: { lines?: number }) {
   );
 }
 
-export function MonoStat({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: ReactNode;
-  accent?: string;
-}) {
+export function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="border border-edge bg-ink px-2 py-1.5">
-      <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-faint">
-        {label}
-      </div>
-      <div className="mt-0.5 font-mono text-sm font-semibold" style={{ color: accent ?? "#d4d4d4" }}>
-        {value}
-      </div>
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-[11px] text-faint">{label}</span>
+      <span className="text-[12px] font-semibold text-ink">{value}</span>
     </div>
+  );
+}
+
+/** Minimalist inline sparkline — a thin polyline with a terminal dot. */
+export function Sparkline({
+  values,
+  width = 84,
+  height = 18,
+  stroke = "#9c9c96",
+}: {
+  values: number[];
+  width?: number;
+  height?: number;
+  stroke?: string;
+}) {
+  if (values.length < 2) {
+    return <div className="h-[18px] w-[84px] border-b border-edge" />;
+  }
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const pad = 2;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (width - pad * 2);
+    const y = height - pad - ((v - min) / range) * (height - pad * 2);
+    return [x, y] as const;
+  });
+  const last = pts[pts.length - 1];
+  return (
+    <svg width={width} height={height} className="shrink-0" aria-hidden>
+      <polyline
+        points={pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <circle cx={last[0]} cy={last[1]} r="1.8" fill={stroke} />
+    </svg>
   );
 }

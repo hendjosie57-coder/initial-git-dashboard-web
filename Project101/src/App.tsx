@@ -10,7 +10,7 @@ export default function App() {
   const chatOpen = useDashboard((s) => s.chatOpen);
 
   return (
-    <div className="flex h-full flex-col bg-obsidian text-bright">
+    <div className="flex h-full flex-col bg-paper text-ink">
       <TopBar />
       <div className="flex min-h-0 flex-1">
         {/* Main workspace */}
@@ -18,18 +18,18 @@ export default function App() {
           {view === "graph" ? <GraphView /> : <SandboxView />}
         </main>
 
-        {/* Terminal assistant pane */}
+        {/* Blame assistant pane */}
         <AnimatePresence initial={false}>
           {chatOpen && (
             <motion.aside
               key="chat"
               initial={{ width: 0 }}
-              animate={{ width: 400 }}
+              animate={{ width: 384 }}
               exit={{ width: 0 }}
-              transition={{ duration: 0.15, ease: "linear" }}
+              transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
               className="shrink-0 overflow-hidden border-l border-edge"
             >
-              <div className="h-full w-[400px]">
+              <div className="h-full w-[384px]">
                 <ChatPane />
               </div>
             </motion.aside>

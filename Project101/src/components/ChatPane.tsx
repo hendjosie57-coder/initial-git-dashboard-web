@@ -7,25 +7,24 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { CornerDownLeft, Eraser, SquareTerminal } from "lucide-react";
+import { CornerDownLeft, Eraser, MessageSquareText } from "lucide-react";
 import { useDashboard } from "../store";
 import { fileById } from "../data/mockRepo";
 import { segmentsLength, sliceSegments } from "../data/ai";
 import type { ChatMessage, QuickAction } from "../types";
 
 /* ---------------------------------------------------------------------------
-   Terminal Assistant — blame-context query console.
+   Blame assistant — context-aware chat over the selected file.
 
-   · streams response segments token-style with a blinking caret
-   · inline `code` tokens and clickable L42 chips that jump the sandbox editor
-   · syntax-highlighted code blocks
-   · quick commands: /explain-intent  /find-weaknesses  /history
+   The assistant's responses are grounded in the file's source, git blame,
+   merged PRs, and commit history (see data/ai.ts). Answers stream in with
+   a quiet caret; line references are clickable and jump the sandbox editor.
 --------------------------------------------------------------------------- */
 
 const QUICK_ACTIONS: Array<{ id: QuickAction; label: string }> = [
-  { id: "explain-intent", label: "explain-intent" },
-  { id: "find-weaknesses", label: "find-weaknesses" },
-  { id: "history", label: "history" },
+  { id: "explain-intent", label: "Explain intent" },
+  { id: "find-weaknesses", label: "Find weaknesses" },
+  { id: "history", label: "History" },
 ];
 
 /* --- Tiny syntax highlighter (chat code blocks only) ------------------------ */
@@ -83,63 +82,59 @@ function MessageView({ message, onTick }: { message: ChatMessage; onTick: () => 
 
   if (message.role === "user") {
     return (
-      <div className="flex items-start gap-2 font-mono text-[12px]">
-        <span className="mt-px select-none font-bold text-bright">❯</span>
-        <span className="whitespace-pre-wrap break-words text-bright">
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-lg bg-panel px-3 py-1.5 text-[12.5px] leading-relaxed text-ink">
           {message.segments[0]?.kind === "text" ? message.segments[0].text : ""}
-        </span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex items-start gap-2">
-      <span className="mt-px select-none font-mono text-[12px] font-bold text-faint">$</span>
-      <div
-        className={`min-w-0 flex-1 text-[12px] leading-relaxed text-bright/90 ${
-          message.streaming ? "caret" : ""
-        }`}
-      >
-        {visible.map((seg, i) => {
-          switch (seg.kind) {
-            case "text":
-              return (
-                <span key={i} className="whitespace-pre-wrap break-words">
-                  {seg.text}
-                </span>
-              );
-            case "inline":
-              return (
-                <code
-                  key={i}
-                  className="mx-0.5 border border-edge bg-ink-2 px-1 py-px font-mono text-[11px] text-bright"
-                >
-                  {seg.text}
-                </code>
-              );
-            case "lineref":
-              return (
-                <button
-                  key={i}
-                  onClick={() => message.fileId && jumpToLine(message.fileId, seg.line)}
-                  title={`Jump to line ${seg.line} in the sandbox`}
-                  className="mx-0.5 inline-flex translate-y-px items-center gap-0.5 border border-edge bg-ink-2 px-1 py-px font-mono text-[10px] font-semibold text-bright underline decoration-faint underline-offset-2 transition-colors duration-150 hover:border-edge-2 hover:bg-edge"
-                >
-                  {seg.label}
-                </button>
-              );
-            case "block":
-              return (
-                <pre
-                  key={i}
-                  className="my-2 overflow-x-auto border border-edge bg-obsidian p-3 font-mono text-[11px] leading-relaxed"
-                >
-                  {highlight(seg.code)}
-                </pre>
-              );
-          }
-        })}
-      </div>
+    <div
+      className={`min-w-0 text-[12.5px] leading-relaxed text-body ${
+        message.streaming ? "caret" : ""
+      }`}
+    >
+      {visible.map((seg, i) => {
+        switch (seg.kind) {
+          case "text":
+            return (
+              <span key={i} className="whitespace-pre-wrap break-words">
+                {seg.text}
+              </span>
+            );
+          case "inline":
+            return (
+              <code
+                key={i}
+                className="mx-0.5 rounded border border-edge bg-panel px-1 py-px font-mono text-[11px] text-ink"
+              >
+                {seg.text}
+              </code>
+            );
+          case "lineref":
+            return (
+              <button
+                key={i}
+                onClick={() => message.fileId && jumpToLine(message.fileId, seg.line)}
+                title={`Jump to line ${seg.line} in the sandbox`}
+                className="mx-0.5 inline-flex translate-y-px items-center rounded border border-edge bg-card px-1.5 py-px text-[11px] font-medium text-ink underline decoration-edge-2 underline-offset-2 transition-colors duration-200 hover:bg-panel"
+              >
+                {seg.label}
+              </button>
+            );
+          case "block":
+            return (
+              <pre
+                key={i}
+                className="my-2 overflow-x-auto rounded-md border border-edge bg-paper p-3 font-mono text-[11px] leading-relaxed text-ink"
+              >
+                {highlight(seg.code)}
+              </pre>
+            );
+        }
+      })}
     </div>
   );
 }
@@ -173,39 +168,40 @@ export function ChatPane() {
   };
 
   return (
-    <div className="flex h-full flex-col bg-ink">
-      {/* Console header */}
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-edge px-3">
-        <div className="flex items-center gap-1.5 font-mono text-[11px] text-muted">
-          <SquareTerminal size={12} className="text-faint" />
-          <span className="font-semibold uppercase tracking-[0.12em]">Terminal Assistant</span>
-          {file && <span className="text-faint">— {file.name}</span>}
+    <div className="flex h-full flex-col bg-card">
+      {/* Header */}
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-edge px-3.5">
+        <div className="flex items-center gap-2 text-[12px] text-ink">
+          <MessageSquareText size={14} className="text-muted" />
+          <span className="font-semibold">Blame assistant</span>
+          {file && <span className="text-faint">· {file.name}</span>}
         </div>
         <button
           onClick={clearChat}
-          title="Clear session"
-          className="p-1 text-faint transition-colors duration-150 hover:bg-ink-2 hover:text-bright"
+          title="Clear conversation"
+          className="rounded-md p-1 text-faint transition-colors duration-200 hover:bg-panel hover:text-ink"
         >
           <Eraser size={13} />
         </button>
       </div>
 
       {/* Message stream */}
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-3">
+      <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
         {messages.length === 0 && !aiThinking && (
-          <div className="font-mono text-[11px] leading-relaxed text-faint">
+          <div className="text-[12px] leading-relaxed text-faint">
             {file ? (
               <>
                 <p>
-                  blame context loaded: <span className="text-muted">{file.name}</span>
+                  Context loaded for <span className="font-medium text-muted">{file.name}</span>:
+                  source, git blame, merged PRs, and commit history.
                 </p>
-                <p className="mt-1">
-                  source · git blame · merged PRs · commit history indexed.
+                <p className="mt-1.5">
+                  Ask something like <em>“Why was this function rewritten?”</em> or use a quick
+                  action below.
                 </p>
-                <p className="mt-1">type a query or run a /command below.</p>
               </>
             ) : (
-              <p>no context — select a node in the graph to load its blame data.</p>
+              <p>Select a node in the graph to load its blame context.</p>
             )}
           </div>
         )}
@@ -213,43 +209,39 @@ export function ChatPane() {
           <MessageView key={m.id} message={m} onTick={scrollToBottom} />
         ))}
         {aiThinking && (
-          <div className="flex items-start gap-2 font-mono text-[12px]">
-            <span className="mt-px select-none font-bold text-faint">$</span>
-            <span className="caret text-faint">analyzing blame context</span>
-          </div>
+          <div className="caret text-[12px] text-faint">Reading blame context</div>
         )}
       </div>
 
-      {/* Quick commands */}
-      <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-edge px-3 py-2">
+      {/* Quick actions */}
+      <div className="flex shrink-0 flex-wrap gap-1.5 border-t border-edge px-3.5 py-2.5">
         {QUICK_ACTIONS.map((qa) => (
           <button
             key={qa.id}
             disabled={!file || busy}
             onClick={() => file && askAI(file.id, "", qa.id)}
-            className="border border-edge bg-ink-2 px-2 py-0.5 font-mono text-[10px] text-muted transition-colors duration-150 hover:border-edge-2 hover:text-bright disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full border border-edge bg-card px-2.5 py-1 text-[11px] font-medium text-muted transition-colors duration-200 hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
           >
-            /{qa.label}
+            {qa.label}
           </button>
         ))}
       </div>
 
       {/* Input */}
-      <form onSubmit={submit} className="shrink-0 border-t border-edge p-2.5">
-        <div className="flex items-center gap-2 border border-edge bg-obsidian px-2.5 py-1.5 transition-colors duration-150 focus-within:border-edge-2">
-          <span className="select-none font-mono text-[12px] font-bold text-muted">❯</span>
+      <form onSubmit={submit} className="shrink-0 border-t border-edge p-3">
+        <div className="shadow-card flex items-center gap-2 rounded-lg border border-edge bg-card px-3 py-2 transition-colors duration-200 focus-within:border-edge-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={!file}
-            placeholder={file ? `query ${file.name}…` : "select a file first…"}
-            className="w-full bg-transparent font-mono text-[12px] text-bright placeholder:text-faint/60 focus:outline-none disabled:cursor-not-allowed"
+            placeholder={file ? `Ask about ${file.name}…` : "Select a file first…"}
+            className="w-full bg-transparent text-[12.5px] text-ink placeholder:text-faint focus:outline-none disabled:cursor-not-allowed"
             spellCheck={false}
           />
           <button
             type="submit"
             disabled={!file || !input.trim() || busy}
-            className="shrink-0 border border-edge bg-ink-2 p-1 text-muted transition-colors duration-150 hover:text-bright disabled:opacity-40"
+            className="shrink-0 rounded-md border border-edge bg-paper p-1.5 text-muted transition-colors duration-200 hover:text-ink disabled:opacity-40"
           >
             <CornerDownLeft size={12} />
           </button>

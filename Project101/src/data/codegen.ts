@@ -33,7 +33,7 @@ function mulberry32(seed: number) {
   };
 }
 
-function pascalTopic(file: RepoFile): string {
+export function pascalTopic(file: RepoFile): string {
   const base = file.name
     .replace(/\.(tsx|ts|js)$/, "")
     .replace(/^use/, "")
@@ -277,7 +277,6 @@ export function computeImpact(file: RepoFile): ImpactMetrics {
       : dependents >= 2 || file.coverage < 45
         ? "medium"
         : "low";
-  const coverageAfter = Math.min(96, file.coverage + Math.round(14 + rng() * 22));
   return {
     complexityBefore: file.complexity,
     complexityAfter,
@@ -285,8 +284,5 @@ export function computeImpact(file: RepoFile): ImpactMetrics {
     locBefore: code.legacyLines,
     locAfter: code.modernLines,
     regressionRisk,
-    coverageBefore: file.coverage,
-    coverageAfter,
-    affectedDependents: dependents,
   };
 }

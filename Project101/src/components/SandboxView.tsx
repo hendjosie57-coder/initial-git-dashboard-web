@@ -1,43 +1,44 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
-import { ArrowLeft, History, Lock, PencilLine } from "lucide-react";
+import { ArrowLeft, GitCompareArrows, Lock, PencilLine } from "lucide-react";
 import { useDashboard } from "../store";
 import { authorById, fileById, relativeTime } from "../data/mockRepo";
 import { getFileCode } from "../data/codegen";
 import { ImpactReport } from "./ImpactReport";
-import { RiskBadge, SkeletonLines } from "./ui";
+import { ComplexityBadge, SkeletonLines } from "./ui";
 
 /* ---------------------------------------------------------------------------
-   Refactor Sandbox — three columns:
+   Refactor Sandbox — legacy code and its modernized transformation side by
+   side, plus a slim automated analysis column:
      1. legacy source, read-only Monaco with a git-blame gutter
      2. modernized source, editable Monaco
-     3. automated impact report
+     3. impact analysis (complexity delta + regression risk)
 --------------------------------------------------------------------------- */
 
 function defineTheme(monaco: Monaco) {
-  monaco.editor.defineTheme("gitdash", {
-    base: "vs-dark",
+  monaco.editor.defineTheme("gitdash-light", {
+    base: "vs",
     inherit: true,
     rules: [
-      { token: "comment", foreground: "6a9955", fontStyle: "italic" },
-      { token: "keyword", foreground: "c586c0" },
-      { token: "string", foreground: "ce9178" },
-      { token: "number", foreground: "b5cea8" },
-      { token: "type", foreground: "4ec9b0" },
+      { token: "comment", foreground: "8f8f89", fontStyle: "italic" },
+      { token: "keyword", foreground: "7a5c8f" },
+      { token: "string", foreground: "5e7f4d" },
+      { token: "number", foreground: "a06a2c" },
+      { token: "type", foreground: "4e7f78" },
     ],
     colors: {
-      "editor.background": "#181818",
-      "editor.foreground": "#d4d4d4",
-      "editor.lineHighlightBackground": "#1e1e1e66",
-      "editorLineNumber.foreground": "#6e6e6e",
-      "editorLineNumber.activeForeground": "#9d9d9d",
-      "editorIndentGuide.background1": "#333333",
-      "editorGutter.background": "#181818",
-      "editorWidget.background": "#1e1e1e",
-      "editorWidget.border": "#333333",
-      "scrollbarSlider.background": "#45454566",
-      "scrollbarSlider.hoverBackground": "#454545aa",
+      "editor.background": "#fcfcfb",
+      "editor.foreground": "#2a2a2a",
+      "editor.lineHighlightBackground": "#f0f0ec88",
+      "editorLineNumber.foreground": "#a3a39d",
+      "editorLineNumber.activeForeground": "#6e6e68",
+      "editorIndentGuide.background1": "#e6e6e1",
+      "editorGutter.background": "#fcfcfb",
+      "editorWidget.background": "#f7f7f5",
+      "editorWidget.border": "#d1d1cd",
+      "scrollbarSlider.background": "#c9c9c466",
+      "scrollbarSlider.hoverBackground": "#c9c9c4aa",
     },
   });
 }
@@ -52,7 +53,7 @@ const BASE_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
   folding: false,
   smoothScrolling: false,
   cursorBlinking: "blink",
-  padding: { top: 8, bottom: 8 },
+  padding: { top: 10, bottom: 10 },
   scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
   overviewRulerLanes: 0,
   hideCursorInOverviewRuler: true,
@@ -62,7 +63,7 @@ const BASE_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
 
 function EditorSkeleton() {
   return (
-    <div className="h-full bg-obsidian p-4">
+    <div className="h-full bg-card p-4">
       <SkeletonLines lines={6} />
     </div>
   );
@@ -72,23 +73,18 @@ function ColumnHeader({
   icon,
   title,
   hint,
-  tone,
 }: {
   icon: React.ReactNode;
   title: string;
   hint: string;
-  tone?: string;
 }) {
   return (
-    <div className="flex h-8 shrink-0 items-center justify-between border-b border-edge bg-ink px-3">
-      <div
-        className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
-        style={{ color: tone ?? "#9d9d9d" }}
-      >
+    <div className="flex h-9 shrink-0 items-center justify-between border-b border-edge bg-paper px-3">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
         {icon}
         {title}
       </div>
-      <span className="font-mono text-[9px] text-faint">{hint}</span>
+      <span className="text-[10px] text-faint">{hint}</span>
     </div>
   );
 }
@@ -158,20 +154,20 @@ export function SandboxView() {
         options: { isWholeLine: true, className: "jump-line-flash" },
       },
     ]);
-    const timer = window.setTimeout(() => flash.clear(), 900);
+    const timer = window.setTimeout(() => flash.clear(), 1300);
     return () => window.clearTimeout(timer);
   }, [revealTarget, legacyReady, file]);
 
   if (!file || !code) {
     return (
-      <div className="flex h-full items-center justify-center bg-obsidian">
+      <div className="flex h-full items-center justify-center bg-paper">
         <div className="text-center">
-          <p className="font-mono text-[12px] text-muted">no file loaded in the sandbox</p>
+          <p className="text-[13px] text-muted">No file loaded in the sandbox.</p>
           <button
             onClick={() => setView("graph")}
-            className="mt-3 inline-flex items-center gap-1.5 border border-edge bg-ink-2 px-3 py-1.5 font-mono text-[11px] font-semibold text-muted transition-colors duration-150 hover:text-bright"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-edge bg-card px-3 py-1.5 text-[12px] font-medium text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
           >
-            <ArrowLeft size={12} /> Back to the debt graph
+            <ArrowLeft size={12} /> Back to the graph
           </button>
         </div>
       </div>
@@ -181,21 +177,21 @@ export function SandboxView() {
   const draft = modernDrafts[file.id] ?? code.modern;
 
   return (
-    <div className="flex h-full flex-col bg-obsidian">
+    <div className="flex h-full flex-col bg-paper">
       {/* Context header */}
-      <div className="flex h-10 shrink-0 items-center justify-between border-b border-edge bg-ink px-3">
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-edge bg-card px-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setView("graph")}
-            className="flex items-center gap-1 border border-edge bg-ink-2 px-2 py-0.5 font-mono text-[10px] font-semibold text-muted transition-colors duration-150 hover:text-bright"
+            className="flex items-center gap-1 rounded-md border border-edge bg-card px-2 py-1 text-[11px] font-medium text-muted transition-colors duration-200 hover:bg-panel hover:text-ink"
           >
             <ArrowLeft size={11} /> Graph
           </button>
-          <span className="font-mono text-[12px] text-bright">{file.path}</span>
-          <RiskBadge risk={file.risk} />
+          <span className="text-[13px] font-medium text-ink">{file.path}</span>
+          <ComplexityBadge value={file.complexity} />
         </div>
-        <div className="font-mono text-[10px] text-faint">
-          debt {file.debtScore}/100 · complexity {file.complexity} · churn {file.churn}/90d
+        <div className="text-[11px] text-faint">
+          {file.churn} commits / 90d · {file.loc.toLocaleString()} lines
         </div>
       </div>
 
@@ -204,16 +200,15 @@ export function SandboxView() {
         {/* Legacy */}
         <div className="flex min-w-0 flex-1 flex-col border-r border-edge">
           <ColumnHeader
-            icon={<Lock size={11} />}
+            icon={<Lock size={12} />}
             title="Legacy source"
             hint="read-only · blame gutter"
-            tone="#f85149"
           />
           <div className="min-h-0 flex-1">
             <Editor
               language="javascript"
               value={code.legacy}
-              theme="gitdash"
+              theme="gitdash-light"
               beforeMount={defineTheme}
               onMount={handleLegacyMount}
               loading={<EditorSkeleton />}
@@ -235,16 +230,15 @@ export function SandboxView() {
         {/* Modernized */}
         <div className="flex min-w-0 flex-1 flex-col border-r border-edge">
           <ColumnHeader
-            icon={<PencilLine size={11} />}
+            icon={<PencilLine size={12} />}
             title="Modernized"
             hint="editable · suggested rewrite"
-            tone="#3fb950"
           />
           <div className="min-h-0 flex-1">
             <Editor
               language="typescript"
               value={draft}
-              theme="gitdash"
+              theme="gitdash-light"
               beforeMount={defineTheme}
               loading={<EditorSkeleton />}
               onChange={(value) => setModernDraft(file.id, value ?? "")}
@@ -253,11 +247,11 @@ export function SandboxView() {
           </div>
         </div>
 
-        {/* Impact report */}
-        <div className="flex w-[300px] shrink-0 flex-col bg-ink xl:w-[340px]">
+        {/* Impact analysis */}
+        <div className="flex w-[288px] shrink-0 flex-col bg-paper xl:w-[320px]">
           <ColumnHeader
-            icon={<History size={11} />}
-            title="Automated analysis"
+            icon={<GitCompareArrows size={12} />}
+            title="Analysis"
             hint="static + blame heuristics"
           />
           <div className="min-h-0 flex-1">

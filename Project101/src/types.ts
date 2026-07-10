@@ -112,7 +112,4 @@ export interface ImpactMetrics {
   locBefore: number;
   locAfter: number;
   regressionRisk: Risk;
-  coverageBefore: number;
-  coverageAfter: number;
-  affectedDependents: number;
 }

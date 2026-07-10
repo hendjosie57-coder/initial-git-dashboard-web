@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import { REPO } from "../data/mockRepo";
+import type { GraphSubset } from "../data/mockRepo";
 import { useDashboard } from "../store";
-import { hexToRgba, nodeColor, nodeRadius } from "../lib/colors";
+import { complexityColor, hexToRgba, nodeRadius, SAGE } from "../lib/colors";
 import type { RepoFile } from "../types";
 
 /* ---------------------------------------------------------------------------
-   Full-screen force-directed repository map. Flat matte rendering.
+   Force-directed module map, capped to the top 10–12 files.
 
    Node size  → cyclomatic complexity
-   Node color → churn/risk heatmap (git diff semantics: green/amber/red)
-   Search     → non-matching nodes and their links dim to near-invisible
+   Node color → complexity ramp (sage → dusty mustard → terracotta)
+   Click      → selects the file in the global store
 --------------------------------------------------------------------------- */
 
 interface GraphNode {
@@ -20,9 +20,13 @@ interface GraphNode {
   y?: number;
 }
 
-const REFACTORED_COLOR = "#3fb950";
-
-export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
+export function NodeGraph({
+  subset,
+  matchedIds,
+}: {
+  subset: GraphSubset;
+  matchedIds: Set<string> | null;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null);
@@ -36,10 +40,10 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
   // The force engine mutates node/link objects; build them once per mount.
   const graphData = useMemo(
     () => ({
-      nodes: REPO.files.map((file): GraphNode => ({ id: file.id, file })),
-      links: REPO.edges.map((e) => ({ source: e.source, target: e.target })),
+      nodes: subset.files.map((file): GraphNode => ({ id: file.id, file })),
+      links: subset.edges.map((e) => ({ source: e.source, target: e.target })),
     }),
-    [],
+    [subset],
   );
 
   useEffect(() => {
@@ -58,7 +62,7 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
   const handleEngineStop = useCallback(() => {
     if (!didFit.current && fgRef.current) {
       didFit.current = true;
-      fgRef.current.zoomToFit(600, 60);
+      fgRef.current.zoomToFit(500, 90);
     }
   }, []);
 
@@ -77,51 +81,53 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
       const hovered = hoverId === file.id;
       const selected = selectedFileId === file.id;
       const r = nodeRadius(file);
-      const color = refactored ? REFACTORED_COLOR : nodeColor(file);
-      const alpha = dimmed ? 0.07 : 1;
+      const color = refactored ? SAGE : complexityColor(file.complexity);
 
       ctx.save();
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = dimmed ? 0.12 : 1;
 
-      // Flat fill, no shadows or highlights.
+      // Flat matte fill with a hairline border for definition on light ground.
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
+      ctx.strokeStyle = hexToRgba("#2a2a2a", 0.12);
+      ctx.lineWidth = 0.75 / globalScale;
+      ctx.stroke();
 
-      // Selection / hover ring — neutral gray.
+      // Selection / hover ring — quiet charcoal.
       if (selected || hovered) {
         ctx.beginPath();
         ctx.arc(x, y, r + 2.5 / globalScale + 1.5, 0, 2 * Math.PI);
-        ctx.strokeStyle = selected ? "#d4d4d4" : hexToRgba("#d4d4d4", 0.55);
-        ctx.lineWidth = 1.4 / globalScale;
+        ctx.strokeStyle = selected ? "#2a2a2a" : hexToRgba("#2a2a2a", 0.45);
+        ctx.lineWidth = 1.2 / globalScale;
         ctx.stroke();
       }
 
-      // Refactored check ring.
+      // Refactored marker: dashed sage ring.
       if (refactored) {
         ctx.beginPath();
-        ctx.arc(x, y, r + 3, 0, 2 * Math.PI);
-        ctx.strokeStyle = hexToRgba(REFACTORED_COLOR, 0.5);
-        ctx.setLineDash([2, 2]);
+        ctx.arc(x, y, r + 3.5, 0, 2 * Math.PI);
+        ctx.strokeStyle = hexToRgba(SAGE, 0.55);
+        ctx.setLineDash([2.5, 2.5]);
         ctx.lineWidth = 1 / globalScale;
         ctx.stroke();
         ctx.setLineDash([]);
       }
 
-      // Labels appear on zoom-in, hover, or selection.
-      if (!dimmed && (hovered || selected || globalScale > 2.2)) {
-        const fontSize = Math.max(10 / globalScale, 2.2);
-        ctx.font = `500 ${fontSize}px "JetBrains Mono", monospace`;
+      // With ≤12 nodes we can afford always-on labels.
+      if (!dimmed) {
+        const fontSize = Math.max(11 / globalScale, 3);
+        ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         const label = file.name;
         const w = ctx.measureText(label).width;
-        const pad = fontSize * 0.35;
-        ctx.fillStyle = "rgba(24, 24, 24, 0.85)";
-        ctx.fillRect(x - w / 2 - pad, y + r + 2, w + pad * 2, fontSize + pad * 1.4);
-        ctx.fillStyle = hovered || selected ? "#d4d4d4" : "#9d9d9d";
-        ctx.fillText(label, x, y + r + 2 + pad * 0.7);
+        const pad = fontSize * 0.3;
+        ctx.fillStyle = "rgba(247, 247, 245, 0.85)";
+        ctx.fillRect(x - w / 2 - pad, y + r + 3, w + pad * 2, fontSize + pad * 1.6);
+        ctx.fillStyle = hovered || selected ? "#2a2a2a" : "#6e6e68";
+        ctx.fillText(label, x, y + r + 3 + pad * 0.8);
       }
 
       ctx.restore();
@@ -133,7 +139,7 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
     (node: GraphNode, color: string, ctx: CanvasRenderingContext2D) => {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(node.x ?? 0, node.y ?? 0, nodeRadius(node.file) + 3, 0, 2 * Math.PI);
+      ctx.arc(node.x ?? 0, node.y ?? 0, nodeRadius(node.file) + 4, 0, 2 * Math.PI);
       ctx.fill();
     },
     [],
@@ -150,7 +156,7 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
         width={size.width}
         height={size.height}
         graphData={graphData}
-        backgroundColor="#181818"
+        backgroundColor="#f7f7f5"
         nodeId="id"
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nodeCanvasObject={paintNode as any}
@@ -163,13 +169,13 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
           const sid = typeof l.source === "object" ? l.source.id : l.source;
           const tid = typeof l.target === "object" ? l.target.id : l.target;
           const dim = isDimmed(sid) || isDimmed(tid);
-          return dim ? "rgba(51, 51, 51, 0.15)" : "rgba(69, 69, 69, 0.6)";
+          return dim ? "rgba(42, 42, 42, 0.04)" : "rgba(42, 42, 42, 0.14)";
         }}
-        linkWidth={0.8}
+        linkWidth={1}
         linkDirectionalParticles={0}
-        d3AlphaDecay={0.022}
-        d3VelocityDecay={0.32}
-        cooldownTicks={140}
+        d3AlphaDecay={0.03}
+        d3VelocityDecay={0.35}
+        cooldownTicks={120}
         onEngineStop={handleEngineStop}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onNodeHover={(node: any) => setHoverId(node ? node.id : null)}

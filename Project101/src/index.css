@@ -1,38 +1,37 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Git Dashboard design system — industrial workbench
+   Git Dashboard design system — sophisticated minimalist
 
-   Matte charcoal monochrome base. Color is strictly functional:
-     green  = additions / low risk / staged
-     red    = deletions / high risk
-     amber  = warnings / medium risk
-   No glows, no gradients, no colored shadows. 1px structural borders.
+   Soft warm-grey/beige surfaces, dark charcoal text, subtle 1px borders.
+   No neon, no glows, no dark-mode hacker theme. Color appears only where it
+   carries meaning (cyclomatic complexity: sage → dusty mustard → terracotta).
+   Sans-serif everywhere; monospace is reserved for actual code.
 --------------------------------------------------------------------------- */
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+  --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace; /* code blocks + Monaco only */
 
-  /* Surfaces — deep matte charcoals, never pitch black */
-  --color-obsidian: #181818;
-  --color-ink: #1e1e1e;
-  --color-ink-2: #252525;
-  --color-edge: #333333;
-  --color-edge-2: #454545;
+  /* Surfaces — soft beige / light warm grey */
+  --color-paper: #f7f7f5;
+  --color-panel: #ebebe6;
+  --color-card: #fcfcfb;
 
-  /* Text — low-contrast neutral scale */
-  --color-bright: #d4d4d4;
-  --color-muted: #9d9d9d;
-  --color-faint: #6e6e6e;
+  /* Borders */
+  --color-edge: #d1d1cd;
+  --color-edge-2: #bfbfba;
 
-  /* Functional data colors (git diff semantics) */
-  --color-risk-low: #3fb950;
-  --color-risk-mid: #d29922;
-  --color-risk-high: #f85149;
-  --color-add: #3fb950;
-  --color-del: #f85149;
-  --color-warn: #d29922;
+  /* Text — dark charcoal, never pure black */
+  --color-ink: #2a2a2a;
+  --color-body: #4a4a46;
+  --color-muted: #6e6e68;
+  --color-faint: #9c9c96;
+
+  /* Complexity palette — muted, non-neon */
+  --color-sage: #7e8f68;
+  --color-mustard: #b08d3e;
+  --color-terracotta: #b05b41;
 }
 
 html,
@@ -43,48 +42,49 @@ body,
 }
 
 body {
-  background: var(--color-obsidian);
-  color: var(--color-bright);
+  background: var(--color-paper);
+  color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: rgba(110, 110, 110, 0.4);
+  background: rgba(176, 141, 62, 0.22);
 }
 
 /* --- Scrollbars ---------------------------------------------------------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #454545 transparent;
+  scrollbar-color: #c9c9c4 transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #454545;
+  background: #c9c9c4;
+  border-radius: 8px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #555555;
+  background: #b5b5b0;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* --- Utility layers ------------------------------------------------------ */
-@utility panel {
-  background: var(--color-ink);
-  border: 1px solid var(--color-edge);
+/* --- Utilities ------------------------------------------------------------ */
+@utility shadow-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-/* --- Static skeleton (no shimmer) ------------------------------------------ */
+/* --- Skeleton (static, no shimmer) ----------------------------------------- */
 .skeleton {
-  background: var(--color-ink-2);
+  background: var(--color-panel);
+  border-radius: 4px;
 }
 
-/* --- Blinking terminal caret ---------------------------------------------- */
+/* --- Streaming caret -------------------------------------------------------- */
 @keyframes caret-blink {
   0%,
   49% {
@@ -96,46 +96,88 @@ body {
   }
 }
 .caret::after {
-  content: "▍";
+  content: "▏";
   color: var(--color-muted);
-  animation: caret-blink 0.9s steps(1) infinite;
+  animation: caret-blink 1s ease-in-out infinite;
   margin-left: 1px;
 }
 
-/* --- Monaco blame gutter --------------------------------------------------
-   Colored 3px bars in the line-decorations column, one class per author.
-   Author identity is data, so these stay colored (muted, matte tones). --- */
-.blame-bar-0 { border-left: 3px solid #6a89c9; }
-.blame-bar-1 { border-left: 3px solid #5fa8a8; }
-.blame-bar-2 { border-left: 3px solid #c9a15f; }
-.blame-bar-3 { border-left: 3px solid #6fae7d; }
-.blame-bar-4 { border-left: 3px solid #b57a9e; }
-.blame-bar-5 { border-left: 3px solid #9a86c0; }
-.blame-bar-6 { border-left: 3px solid #c08a66; }
-.blame-bar-7 { border-left: 3px solid #8a9199; }
+/* --- Monaco blame gutter ----------------------------------------------------
+   Muted per-author bars in the line-decorations column. Author identity is
+   data, so these stay tinted — desaturated tones that sit well on light. --- */
+.blame-bar-0 { border-left: 3px solid #8395bb; }
+.blame-bar-1 { border-left: 3px solid #7aa3a3; }
+.blame-bar-2 { border-left: 3px solid #bb9a63; }
+.blame-bar-3 { border-left: 3px solid #85a98f; }
+.blame-bar-4 { border-left: 3px solid #b18ba3; }
+.blame-bar-5 { border-left: 3px solid #9d90bb; }
+.blame-bar-6 { border-left: 3px solid #b98f70; }
+.blame-bar-7 { border-left: 3px solid #9aa0a6; }
 
 .monaco-editor .line-numbers {
   font-family: var(--font-mono) !important;
-  color: #6e6e6e !important;
+  color: #a3a39d !important;
 }
 
-/* Highlight flash when the chat jumps the editor to a line */
+/* Soft highlight when the chat jumps the editor to a line */
 @keyframes line-flash {
   0% {
-    background: rgba(212, 212, 212, 0.14);
+    background: rgba(176, 141, 62, 0.2);
   }
   100% {
-    background: rgba(212, 212, 212, 0);
+    background: rgba(176, 141, 62, 0);
   }
 }
 .jump-line-flash {
-  animation: line-flash 0.8s steps(4, end) forwards;
+  animation: line-flash 1.2s ease-out forwards;
 }
 
-/* --- Syntax token colors (chat code blocks) — muted IDE palette ----------- */
-.tok-kw { color: #c586c0; }
-.tok-str { color: #ce9178; }
-.tok-num { color: #b5cea8; }
-.tok-fn { color: #dcdcaa; }
-.tok-com { color: #6a9955; font-style: italic; }
-.tok-type { color: #4ec9b0; }
+/* --- Code block token colors (chat) — muted light palette ------------------ */
+.tok-kw { color: #7a5c8f; }
+.tok-str { color: #5e7f4d; }
+.tok-num { color: #a06a2c; }
+.tok-fn { color: #3e5f8a; }
+.tok-com { color: #8f8f89; font-style: italic; }
+.tok-type { color: #4e7f78; }
+
+/* --- Rendered markdown (legacy code explanations) --------------------------- */
+.prose-min h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+  margin: 14px 0 5px;
+}
+.prose-min h3:first-child {
+  margin-top: 0;
+}
+.prose-min p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--color-body);
+  margin: 5px 0;
+}
+.prose-min ul {
+  margin: 5px 0 5px 16px;
+  list-style: disc;
+}
+.prose-min li {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-body);
+  margin: 3px 0;
+}
+.prose-min li::marker {
+  color: var(--color-faint);
+}
+.prose-min code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-edge);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.prose-min strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
