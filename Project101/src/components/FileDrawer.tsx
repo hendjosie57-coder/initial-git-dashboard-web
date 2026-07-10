@@ -1,18 +1,15 @@
 import { motion } from "framer-motion";
 import {
-  Bug,
   FileCode2,
-  GitCommitHorizontal,
-  GitPullRequest,
   MessageSquareCode,
   SplitSquareHorizontal,
   X,
 } from "lucide-react";
 import { useDashboard } from "../store";
-import { authorById, dependentsOf, relativeTime } from "../data/mockRepo";
-import { debtScoreColor, hexToRgba } from "../lib/colors";
+import { dependentsOf } from "../data/mockRepo";
+import { debtScoreColor } from "../lib/colors";
 import type { RepoFile } from "../types";
-import { Avatar, MonoStat, RiskBadge, SectionLabel } from "./ui";
+import { MonoStat, RiskBadge } from "./ui";
 
 /* Slide-out inspector for the node selected in the graph. */
 
@@ -120,92 +117,6 @@ export function FileDrawer({ file }: { file: RepoFile }) {
           <MonoStat label="Dependents" value={dependents.length} />
         </div>
 
-        {/* Author breakdown */}
-        <div>
-          <SectionLabel>Author breakdown</SectionLabel>
-          <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full">
-            {file.authorShare.map((s) => (
-              <motion.div
-                key={s.authorId}
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="h-full origin-left"
-                style={{ width: `${s.pct}%`, background: authorById(s.authorId).color }}
-              />
-            ))}
-          </div>
-          <div className="mt-2.5 space-y-1.5">
-            {file.authorShare.map((s) => {
-              const a = authorById(s.authorId);
-              return (
-                <div key={s.authorId} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Avatar author={a} size={18} />
-                    <span className="text-[11px] text-muted">{a.name}</span>
-                  </div>
-                  <span className="font-mono text-[11px] font-semibold text-bright">
-                    {s.pct}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bug-introducing commits */}
-        <div>
-          <SectionLabel>Top bug-introducing commits</SectionLabel>
-          <div className="mt-2 space-y-2">
-            {file.bugCommits.map((c) => {
-              const a = authorById(c.authorId);
-              return (
-                <div key={c.hash} className="panel rounded-lg p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 font-mono text-[10px] text-accent-2">
-                      <GitCommitHorizontal size={12} />
-                      {c.hash.slice(0, 7)}
-                    </div>
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 font-mono text-[9px] font-bold"
-                      style={{
-                        color: "#ff5a5a",
-                        background: hexToRgba("#ef4444", 0.12),
-                      }}
-                    >
-                      <Bug size={9} />
-                      {c.bugsIntroduced} bug{c.bugsIntroduced > 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] leading-snug text-bright/90">{c.message}</p>
-                  <div className="mt-1 text-[10px] text-faint">
-                    {a.name} · {relativeTime(c.date)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Recent PRs */}
-        <div>
-          <SectionLabel>Merged pull requests</SectionLabel>
-          <div className="mt-2 space-y-1.5">
-            {file.prs.slice(0, 2).map((pr) => (
-              <div key={pr.number} className="flex items-start gap-2">
-                <GitPullRequest size={12} className="mt-0.5 shrink-0 text-accent" />
-                <div className="min-w-0">
-                  <div className="truncate text-[11px] font-medium text-bright/90">
-                    <span className="font-mono text-faint">#{pr.number}</span> {pr.title}
-                  </div>
-                  <div className="text-[10px] text-faint">
-                    {authorById(pr.authorId).name} · {relativeTime(pr.mergedAt)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Actions */}

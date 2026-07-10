@@ -48,7 +48,7 @@ const daysAgo = (days: number) =>
 /* --- Authors ---------------------------------------------------------------- */
 
 const AUTHOR_DEFS = [
-  ["Sarah Chen", "schen"],
+  ["Sara Chen", "schen"],
   ["Miguel Alvarez", "malvarez"],
   ["Priya Nair", "pnair"],
   ["Tom Okafor", "tokafor"],
