@@ -1,18 +1,10 @@
 import { motion } from "framer-motion";
-import {
-  Bug,
-  FileCode2,
-  GitCommitHorizontal,
-  GitPullRequest,
-  SquareTerminal,
-  SplitSquareHorizontal,
-  X,
-} from "lucide-react";
+import { FileCode2, SquareTerminal, SplitSquareHorizontal, X } from "lucide-react";
 import { useDashboard } from "../store";
-import { authorById, dependentsOf, relativeTime } from "../data/mockRepo";
+import { dependentsOf } from "../data/mockRepo";
 import { debtScoreColor } from "../lib/colors";
 import type { RepoFile } from "../types";
-import { Avatar, MonoStat, RiskBadge, SectionLabel } from "./ui";
+import { MonoStat, RiskBadge, SectionLabel } from "./ui";
 
 /* Structural inspector pane for the node selected in the graph. */
 
@@ -107,86 +99,6 @@ export function FileDrawer({ file }: { file: RepoFile }) {
           />
           <MonoStat label="Commits" value={file.totalCommits} />
           <MonoStat label="Dependents" value={dependents.length} />
-        </div>
-
-        {/* Author breakdown */}
-        <div className="border border-edge bg-ink p-2.5">
-          <SectionLabel>Author breakdown</SectionLabel>
-          <div className="mt-2 flex h-1.5 w-full">
-            {file.authorShare.map((s) => (
-              <div
-                key={s.authorId}
-                className="h-full"
-                style={{ width: `${s.pct}%`, background: authorById(s.authorId).color }}
-              />
-            ))}
-          </div>
-          <div className="mt-2 space-y-1">
-            {file.authorShare.map((s) => {
-              const a = authorById(s.authorId);
-              return (
-                <div key={s.authorId} className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Avatar author={a} size={14} />
-                    <span className="font-mono text-[10px] text-muted">{a.handle}</span>
-                  </div>
-                  <span className="font-mono text-[10px] font-semibold text-bright">
-                    {s.pct}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bug-introducing commits */}
-        <div className="border border-edge bg-ink p-2.5">
-          <SectionLabel>Top bug-introducing commits</SectionLabel>
-          <div className="mt-2 divide-y divide-edge">
-            {file.bugCommits.map((c) => {
-              const a = authorById(c.authorId);
-              return (
-                <div key={c.hash} className="py-1.5 first:pt-0 last:pb-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1 font-mono text-[10px] text-muted">
-                      <GitCommitHorizontal size={11} className="text-faint" />
-                      {c.hash.slice(0, 7)}
-                    </span>
-                    <span className="flex items-center gap-1 font-mono text-[9px] font-semibold text-del">
-                      <Bug size={9} />
-                      {c.bugsIntroduced} bug{c.bugsIntroduced > 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 truncate text-[10px] leading-snug text-bright/90">
-                    {c.message}
-                  </p>
-                  <div className="font-mono text-[9px] text-faint">
-                    {a.handle} · {relativeTime(c.date)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Merged PRs */}
-        <div className="border border-edge bg-ink p-2.5">
-          <SectionLabel>Merged pull requests</SectionLabel>
-          <div className="mt-2 space-y-1.5">
-            {file.prs.slice(0, 3).map((pr) => (
-              <div key={pr.number} className="flex items-start gap-1.5">
-                <GitPullRequest size={11} className="mt-0.5 shrink-0 text-faint" />
-                <div className="min-w-0">
-                  <div className="truncate text-[10px] font-medium text-bright/90">
-                    <span className="font-mono text-faint">#{pr.number}</span> {pr.title}
-                  </div>
-                  <div className="font-mono text-[9px] text-faint">
-                    {authorById(pr.authorId).handle} · {relativeTime(pr.mergedAt)}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
