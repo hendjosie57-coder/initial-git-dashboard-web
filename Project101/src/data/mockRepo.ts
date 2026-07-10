@@ -58,15 +58,16 @@ const AUTHOR_DEFS = [
   ["Rob Muller", "rmuller"],
 ] as const;
 
+/* Muted matte tones, index-matched to the .blame-bar-N classes in index.css. */
 const AUTHOR_COLORS = [
-  "#6366f1",
-  "#22d3ee",
-  "#f59e0b",
-  "#10b981",
-  "#ec4899",
-  "#a78bfa",
-  "#f97316",
-  "#94a3b8",
+  "#6a89c9",
+  "#5fa8a8",
+  "#c9a15f",
+  "#6fae7d",
+  "#b57a9e",
+  "#9a86c0",
+  "#c08a66",
+  "#8a9199",
 ];
 
 export const AUTHORS: Author[] = AUTHOR_DEFS.map(([name, handle], i) => ({

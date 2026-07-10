@@ -1,11 +1,12 @@
 import type { RepoFile, Risk } from "../types";
 
-/** Heatmap rule: color encodes commit churn, escalated by complexity. */
+/** Heatmap rule: color encodes commit churn, escalated by complexity.
+    Palette follows git diff semantics — green/amber/red, matte, no glow. */
 
 export const RISK_COLORS: Record<Risk, string> = {
-  low: "#10b981", // deep emerald
-  medium: "#f59e0b", // warm amber
-  high: "#ff5a5a", // glowing neon coral
+  low: "#3fb950", // git addition green
+  medium: "#d29922", // warning amber
+  high: "#f85149", // git deletion red
 };
 
 export const RISK_LABELS: Record<Risk, string> = {
@@ -14,8 +15,8 @@ export const RISK_LABELS: Record<Risk, string> = {
   high: "High risk",
 };
 
-/** Muted slate for very quiet, simple files so the map doesn't read all-green. */
-const SLATE = "#475569";
+/** Neutral gray for very quiet, simple files so the map doesn't read all-green. */
+const SLATE = "#5a5a5a";
 
 export function riskOf(complexityNorm: number, churnNorm: number): Risk {
   const heat = complexityNorm * 0.5 + churnNorm * 0.5;

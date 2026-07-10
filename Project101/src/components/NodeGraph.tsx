@@ -6,10 +6,10 @@ import { hexToRgba, nodeColor, nodeRadius } from "../lib/colors";
 import type { RepoFile } from "../types";
 
 /* ---------------------------------------------------------------------------
-   Full-screen force-directed repository map.
+   Full-screen force-directed repository map. Flat matte rendering.
 
    Node size  → cyclomatic complexity
-   Node color → churn/risk heatmap (high risk glows neon coral)
+   Node color → churn/risk heatmap (git diff semantics: green/amber/red)
    Search     → non-matching nodes and their links dim to near-invisible
 --------------------------------------------------------------------------- */
 
@@ -20,7 +20,7 @@ interface GraphNode {
   y?: number;
 }
 
-const REFACTORED_COLOR = "#10b981";
+const REFACTORED_COLOR = "#3fb950";
 
 export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,30 +83,18 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
       ctx.save();
       ctx.globalAlpha = alpha;
 
-      // Neon glow for high-risk (and freshly refactored) nodes.
-      if (!dimmed && (file.risk === "high" || refactored || hovered)) {
-        ctx.shadowColor = color;
-        ctx.shadowBlur = refactored ? 14 : file.risk === "high" ? 18 : 10;
-      }
-
+      // Flat fill, no shadows or highlights.
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
-      ctx.shadowBlur = 0;
 
-      // Inner core adds depth.
-      ctx.beginPath();
-      ctx.arc(x, y, r * 0.55, 0, 2 * Math.PI);
-      ctx.fillStyle = hexToRgba("#ffffff", 0.14);
-      ctx.fill();
-
-      // Selection / hover ring.
+      // Selection / hover ring — neutral gray.
       if (selected || hovered) {
         ctx.beginPath();
         ctx.arc(x, y, r + 2.5 / globalScale + 1.5, 0, 2 * Math.PI);
-        ctx.strokeStyle = selected ? "#22d3ee" : hexToRgba("#f9fafb", 0.7);
-        ctx.lineWidth = 1.6 / globalScale;
+        ctx.strokeStyle = selected ? "#d4d4d4" : hexToRgba("#d4d4d4", 0.55);
+        ctx.lineWidth = 1.4 / globalScale;
         ctx.stroke();
       }
 
@@ -130,9 +118,9 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
         const label = file.name;
         const w = ctx.measureText(label).width;
         const pad = fontSize * 0.35;
-        ctx.fillStyle = "rgba(11, 15, 25, 0.82)";
+        ctx.fillStyle = "rgba(24, 24, 24, 0.85)";
         ctx.fillRect(x - w / 2 - pad, y + r + 2, w + pad * 2, fontSize + pad * 1.4);
-        ctx.fillStyle = hovered || selected ? "#f9fafb" : "#9ca3af";
+        ctx.fillStyle = hovered || selected ? "#d4d4d4" : "#9d9d9d";
         ctx.fillText(label, x, y + r + 2 + pad * 0.7);
       }
 
@@ -162,7 +150,7 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
         width={size.width}
         height={size.height}
         graphData={graphData}
-        backgroundColor="#0b0f19"
+        backgroundColor="#181818"
         nodeId="id"
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nodeCanvasObject={paintNode as any}
@@ -175,7 +163,7 @@ export function NodeGraph({ matchedIds }: { matchedIds: Set<string> | null }) {
           const sid = typeof l.source === "object" ? l.source.id : l.source;
           const tid = typeof l.target === "object" ? l.target.id : l.target;
           const dim = isDimmed(sid) || isDimmed(tid);
-          return dim ? "rgba(31, 41, 61, 0.12)" : "rgba(42, 54, 80, 0.55)";
+          return dim ? "rgba(51, 51, 51, 0.15)" : "rgba(69, 69, 69, 0.6)";
         }}
         linkWidth={0.8}
         linkDirectionalParticles={0}

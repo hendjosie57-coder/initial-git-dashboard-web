@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
-import { motion } from "framer-motion";
 import { ArrowLeft, History, Lock, PencilLine } from "lucide-react";
 import { useDashboard } from "../store";
 import { authorById, fileById, relativeTime } from "../data/mockRepo";
@@ -21,24 +20,24 @@ function defineTheme(monaco: Monaco) {
     base: "vs-dark",
     inherit: true,
     rules: [
-      { token: "comment", foreground: "64748b", fontStyle: "italic" },
-      { token: "keyword", foreground: "c084fc" },
-      { token: "string", foreground: "86efac" },
-      { token: "number", foreground: "fbbf24" },
-      { token: "type", foreground: "5eead4" },
+      { token: "comment", foreground: "6a9955", fontStyle: "italic" },
+      { token: "keyword", foreground: "c586c0" },
+      { token: "string", foreground: "ce9178" },
+      { token: "number", foreground: "b5cea8" },
+      { token: "type", foreground: "4ec9b0" },
     ],
     colors: {
-      "editor.background": "#0b0f19",
-      "editor.foreground": "#e2e8f0",
-      "editor.lineHighlightBackground": "#12182666",
-      "editorLineNumber.foreground": "#475569",
-      "editorLineNumber.activeForeground": "#9ca3af",
-      "editorIndentGuide.background1": "#1f293d",
-      "editorGutter.background": "#0b0f19",
-      "editorWidget.background": "#121826",
-      "editorWidget.border": "#1f293d",
-      "scrollbarSlider.background": "#2a365066",
-      "scrollbarSlider.hoverBackground": "#2a3650aa",
+      "editor.background": "#181818",
+      "editor.foreground": "#d4d4d4",
+      "editor.lineHighlightBackground": "#1e1e1e66",
+      "editorLineNumber.foreground": "#6e6e6e",
+      "editorLineNumber.activeForeground": "#9d9d9d",
+      "editorIndentGuide.background1": "#333333",
+      "editorGutter.background": "#181818",
+      "editorWidget.background": "#1e1e1e",
+      "editorWidget.border": "#333333",
+      "scrollbarSlider.background": "#45454566",
+      "scrollbarSlider.hoverBackground": "#454545aa",
     },
   });
 }
@@ -51,9 +50,9 @@ const BASE_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
   scrollBeyondLastLine: false,
   renderLineHighlight: "line",
   folding: false,
-  smoothScrolling: true,
-  cursorBlinking: "phase",
-  padding: { top: 12, bottom: 12 },
+  smoothScrolling: false,
+  cursorBlinking: "blink",
+  padding: { top: 8, bottom: 8 },
   scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
   overviewRulerLanes: 0,
   hideCursorInOverviewRuler: true,
@@ -78,11 +77,14 @@ function ColumnHeader({
   icon: React.ReactNode;
   title: string;
   hint: string;
-  tone: string;
+  tone?: string;
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between border-b border-edge bg-ink px-3">
-      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: tone }}>
+    <div className="flex h-8 shrink-0 items-center justify-between border-b border-edge bg-ink px-3">
+      <div
+        className="flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em]"
+        style={{ color: tone ?? "#9d9d9d" }}
+      >
         {icon}
         {title}
       </div>
@@ -156,7 +158,7 @@ export function SandboxView() {
         options: { isWholeLine: true, className: "jump-line-flash" },
       },
     ]);
-    const timer = window.setTimeout(() => flash.clear(), 1700);
+    const timer = window.setTimeout(() => flash.clear(), 900);
     return () => window.clearTimeout(timer);
   }, [revealTarget, legacyReady, file]);
 
@@ -164,10 +166,10 @@ export function SandboxView() {
     return (
       <div className="flex h-full items-center justify-center bg-obsidian">
         <div className="text-center">
-          <p className="text-[13px] text-muted">No file loaded in the sandbox.</p>
+          <p className="font-mono text-[12px] text-muted">no file loaded in the sandbox</p>
           <button
             onClick={() => setView("graph")}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-edge bg-ink-2 px-3 py-1.5 text-[11px] font-semibold text-muted hover:text-bright"
+            className="mt-3 inline-flex items-center gap-1.5 border border-edge bg-ink-2 px-3 py-1.5 font-mono text-[11px] font-semibold text-muted transition-colors duration-150 hover:text-bright"
           >
             <ArrowLeft size={12} /> Back to the debt graph
           </button>
@@ -179,18 +181,13 @@ export function SandboxView() {
   const draft = modernDrafts[file.id] ?? code.modern;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="flex h-full flex-col bg-obsidian"
-    >
+    <div className="flex h-full flex-col bg-obsidian">
       {/* Context header */}
-      <div className="flex h-11 shrink-0 items-center justify-between border-b border-edge bg-ink px-3">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-edge bg-ink px-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setView("graph")}
-            className="flex items-center gap-1 rounded-md border border-edge bg-ink-2 px-2 py-1 text-[10px] font-semibold text-muted transition-colors hover:text-bright"
+            className="flex items-center gap-1 border border-edge bg-ink-2 px-2 py-0.5 font-mono text-[10px] font-semibold text-muted transition-colors duration-150 hover:text-bright"
           >
             <ArrowLeft size={11} /> Graph
           </button>
@@ -210,7 +207,7 @@ export function SandboxView() {
             icon={<Lock size={11} />}
             title="Legacy source"
             hint="read-only · blame gutter"
-            tone="#ff5a5a"
+            tone="#f85149"
           />
           <div className="min-h-0 flex-1">
             <Editor
@@ -240,8 +237,8 @@ export function SandboxView() {
           <ColumnHeader
             icon={<PencilLine size={11} />}
             title="Modernized"
-            hint="editable · AI suggestion"
-            tone="#10b981"
+            hint="editable · suggested rewrite"
+            tone="#3fb950"
           />
           <div className="min-h-0 flex-1">
             <Editor
@@ -257,18 +254,17 @@ export function SandboxView() {
         </div>
 
         {/* Impact report */}
-        <div className="flex w-[300px] shrink-0 flex-col bg-ink/50 xl:w-[340px]">
+        <div className="flex w-[300px] shrink-0 flex-col bg-ink xl:w-[340px]">
           <ColumnHeader
             icon={<History size={11} />}
             title="Automated analysis"
             hint="static + blame heuristics"
-            tone="#22d3ee"
           />
           <div className="min-h-0 flex-1">
             <ImpactReport file={file} />
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

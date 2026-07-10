@@ -1,36 +1,38 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Git Dashboard design system
-   Obsidian dark theme · Inter + JetBrains Mono · heatmap accent scale
+   Git Dashboard design system — industrial workbench
+
+   Matte charcoal monochrome base. Color is strictly functional:
+     green  = additions / low risk / staged
+     red    = deletions / high risk
+     amber  = warnings / medium risk
+   No glows, no gradients, no colored shadows. 1px structural borders.
 --------------------------------------------------------------------------- */
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
 
-  /* Surfaces */
-  --color-obsidian: #0b0f19;
-  --color-ink: #121826;
-  --color-ink-2: #161d2e;
-  --color-edge: #1f293d;
-  --color-edge-2: #2a3650;
+  /* Surfaces — deep matte charcoals, never pitch black */
+  --color-obsidian: #181818;
+  --color-ink: #1e1e1e;
+  --color-ink-2: #252525;
+  --color-edge: #333333;
+  --color-edge-2: #454545;
 
-  /* Text */
-  --color-bright: #f9fafb;
-  --color-muted: #9ca3af;
-  --color-faint: #64748b;
+  /* Text — low-contrast neutral scale */
+  --color-bright: #d4d4d4;
+  --color-muted: #9d9d9d;
+  --color-faint: #6e6e6e;
 
-  /* Heatmap scale */
-  --color-risk-low: #10b981;
-  --color-risk-slate: #475569;
-  --color-risk-mid: #f59e0b;
-  --color-risk-high: #ef4444;
-  --color-risk-glow: #ff5a5a;
-
-  /* Accents */
-  --color-accent: #6366f1;
-  --color-accent-2: #22d3ee;
+  /* Functional data colors (git diff semantics) */
+  --color-risk-low: #3fb950;
+  --color-risk-mid: #d29922;
+  --color-risk-high: #f85149;
+  --color-add: #3fb950;
+  --color-del: #f85149;
+  --color-warn: #d29922;
 }
 
 html,
@@ -49,64 +51,37 @@ body {
 }
 
 ::selection {
-  background: rgba(99, 102, 241, 0.35);
+  background: rgba(110, 110, 110, 0.4);
 }
 
 /* --- Scrollbars ---------------------------------------------------------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a3650 transparent;
+  scrollbar-color: #454545 transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2a3650;
-  border-radius: 8px;
+  background: #454545;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #3b4a6b;
+  background: #555555;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 
 /* --- Utility layers ------------------------------------------------------ */
-@utility glow-red {
-  box-shadow:
-    0 0 18px rgba(255, 90, 90, 0.35),
-    0 0 42px rgba(239, 68, 68, 0.18);
-}
-@utility glow-emerald {
-  box-shadow:
-    0 0 18px rgba(16, 185, 129, 0.35),
-    0 0 42px rgba(16, 185, 129, 0.15);
-}
-@utility glow-accent {
-  box-shadow:
-    0 0 16px rgba(99, 102, 241, 0.35),
-    0 0 40px rgba(99, 102, 241, 0.15);
-}
 @utility panel {
   background: var(--color-ink);
   border: 1px solid var(--color-edge);
 }
 
-/* --- Shimmer skeleton ----------------------------------------------------- */
-@keyframes shimmer {
-  0% {
-    background-position: -400px 0;
-  }
-  100% {
-    background-position: 400px 0;
-  }
-}
+/* --- Static skeleton (no shimmer) ------------------------------------------ */
 .skeleton {
-  background: linear-gradient(90deg, #161d2e 25%, #1f293d 50%, #161d2e 75%);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: 6px;
+  background: var(--color-ink-2);
 }
 
 /* --- Blinking terminal caret ---------------------------------------------- */
@@ -122,60 +97,45 @@ body {
 }
 .caret::after {
   content: "▍";
-  color: var(--color-accent-2);
-  animation: caret-blink 0.9s infinite;
+  color: var(--color-muted);
+  animation: caret-blink 0.9s steps(1) infinite;
   margin-left: 1px;
 }
 
-/* --- Pulsing status dot ---------------------------------------------------- */
-@keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(0.82);
-  }
-}
-.pulse-dot {
-  animation: pulse-dot 2.2s ease-in-out infinite;
-}
-
 /* --- Monaco blame gutter --------------------------------------------------
-   Colored 3px bars in the line-decorations column, one class per author. --- */
-.blame-bar-0 { border-left: 3px solid #6366f1; }
-.blame-bar-1 { border-left: 3px solid #22d3ee; }
-.blame-bar-2 { border-left: 3px solid #f59e0b; }
-.blame-bar-3 { border-left: 3px solid #10b981; }
-.blame-bar-4 { border-left: 3px solid #ec4899; }
-.blame-bar-5 { border-left: 3px solid #a78bfa; }
-.blame-bar-6 { border-left: 3px solid #f97316; }
-.blame-bar-7 { border-left: 3px solid #94a3b8; }
+   Colored 3px bars in the line-decorations column, one class per author.
+   Author identity is data, so these stay colored (muted, matte tones). --- */
+.blame-bar-0 { border-left: 3px solid #6a89c9; }
+.blame-bar-1 { border-left: 3px solid #5fa8a8; }
+.blame-bar-2 { border-left: 3px solid #c9a15f; }
+.blame-bar-3 { border-left: 3px solid #6fae7d; }
+.blame-bar-4 { border-left: 3px solid #b57a9e; }
+.blame-bar-5 { border-left: 3px solid #9a86c0; }
+.blame-bar-6 { border-left: 3px solid #c08a66; }
+.blame-bar-7 { border-left: 3px solid #8a9199; }
 
 .monaco-editor .line-numbers {
   font-family: var(--font-mono) !important;
-  color: #475569 !important;
+  color: #6e6e6e !important;
 }
 
 /* Highlight flash when the chat jumps the editor to a line */
 @keyframes line-flash {
   0% {
-    background: rgba(34, 211, 238, 0.28);
+    background: rgba(212, 212, 212, 0.14);
   }
   100% {
-    background: rgba(34, 211, 238, 0);
+    background: rgba(212, 212, 212, 0);
   }
 }
 .jump-line-flash {
-  animation: line-flash 1.6s ease-out forwards;
+  animation: line-flash 0.8s steps(4, end) forwards;
 }
 
-/* --- Simple syntax highlight token colors (chat code blocks) -------------- */
-.tok-kw { color: #c084fc; }
-.tok-str { color: #86efac; }
-.tok-num { color: #fbbf24; }
-.tok-fn { color: #7dd3fc; }
-.tok-com { color: #64748b; font-style: italic; }
-.tok-type { color: #5eead4; }
+/* --- Syntax token colors (chat code blocks) — muted IDE palette ----------- */
+.tok-kw { color: #c586c0; }
+.tok-str { color: #ce9178; }
+.tok-num { color: #b5cea8; }
+.tok-fn { color: #dcdcaa; }
+.tok-com { color: #6a9955; font-style: italic; }
+.tok-type { color: #4ec9b0; }

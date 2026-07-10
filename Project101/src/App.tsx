@@ -18,15 +18,15 @@ export default function App() {
           {view === "graph" ? <GraphView /> : <SandboxView />}
         </main>
 
-        {/* Contextual Blame AI pane */}
+        {/* Terminal assistant pane */}
         <AnimatePresence initial={false}>
           {chatOpen && (
             <motion.aside
               key="chat"
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 400, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 36 }}
+              initial={{ width: 0 }}
+              animate={{ width: 400 }}
+              exit={{ width: 0 }}
+              transition={{ duration: 0.15, ease: "linear" }}
               className="shrink-0 overflow-hidden border-l border-edge"
             >
               <div className="h-full w-[400px]">
