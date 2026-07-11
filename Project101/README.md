@@ -2,7 +2,9 @@
 
 A codebase analysis dashboard for legacy repositories. It renders the most load-bearing part of a repository as an interactive module graph — sized and colored by cyclomatic complexity — and pairs it with a blame-aware chat assistant, human-readable legacy-code explanations, a refactor history timeline, and a side-by-side refactor sandbox built on Monaco.
 
-The entire app runs against a **deterministic, seeded mock data engine**: a synthetic 56-file legacy monolith with realistic directories, dependency edges, authors, commit history, pull requests, and per-file source code. No backend or network dependency is required to explore the product (Monaco's editor engine itself loads from a CDN at runtime; everything else is local).
+The app runs against a **local FastAPI analysis engine** ([`backend/`](backend/)) that shells out to `git` (log, blame, numstat) and runs radon complexity metrics over a target repository, serving live topology, per-file history, and blame-grounded chat replies at `http://localhost:8000`. The UI will not show data unless the backend is running — see [Getting started](#getting-started).
+
+> **Note:** an earlier prototype of this app ran entirely on a deterministic, seeded mock data engine. Those modules are still in the tree under [`src/data/`](src/data/) but are **no longer imported by any live code path** — the sections below that describe them are retained as documentation of that prototype.
 
 ---
 
@@ -64,7 +66,16 @@ npm run lint       # run oxlint
 npx tsc --noEmit   # full TypeScript type-check (not wired into build/lint)
 ```
 
-No environment variables or backend services are required — the mock data engine generates the entire repository in-memory on module load.
+The UI needs the FastAPI backend running to show any data:
+
+```bash
+cd backend
+python -m venv .venv && .venv/Scripts/activate   # or source .venv/bin/activate
+pip install -r requirements.txt
+python main.py     # serves http://127.0.0.1:8000 (docs at /docs)
+```
+
+By default the backend analyzes the repository containing this project; point `TARGET_REPO_PATH` at any other local git repo to audit it instead. Optional: set `ANTHROPIC_API_KEY` (and `pip install anthropic`) to upgrade the chat assistant from the built-in deterministic analyst to real LLM answers; set `VITE_API_BASE_URL` to point the UI at a non-default backend address.
 
 **Node.js requirement:** the project needs a recent Node.js LTS (v20+) with `npm` on `PATH`. If Node isn't installed system-wide, a portable Node build can be extracted anywhere and prepended to `PATH` for the session, e.g.:
 
@@ -87,12 +98,14 @@ Project101/
    ├─ types.ts                 # All domain types (RepoFile, Commit, PullRequest, ChatMessage, ImpactMetrics, …)
    ├─ index.css                # Tailwind v4 theme tokens + design-system utilities
    ├─ lib/
-   │  └─ colors.ts             # Complexity color ramp, node sizing
-   ├─ data/
+   │  ├─ api.ts                # Typed client for the FastAPI analysis engine (topology, history, chat, health)
+   │  ├─ colors.ts             # Complexity color ramp (green → amber → red), node sizing
+   │  └─ segments.ts           # Markdown → ChatSegment[] conversion + streaming-reveal helpers
+   ├─ data/                    # ⚠ Retired mock prototype — no longer imported by any live code path
    │  ├─ mockRepo.ts           # Seeded repo generator: files, authors, commits, PRs, dependency edges, graph subset
    │  ├─ codegen.ts            # Per-file legacy/modern source synthesis + blame chunk assignment + impact analysis
    │  ├─ insights.ts           # Legacy-code markdown explanations, refactor timeline, commit-metric sparkline data
-   │  └─ ai.ts                 # Mock "AI" response composer (context-grounded, not a real LLM call)
+   │  └─ ai.ts                 # Mock "AI" response composer (superseded by the backend chat endpoint)
    └─ components/
       ├─ TopBar.tsx            # Header: branding, branch, high-complexity count, view switcher, assistant toggle
       ├─ GraphView.tsx         # Graph workspace shell: filter toolbar, canvas, status bar
@@ -109,7 +122,7 @@ Project101/
 The UI deliberately avoids the "AI product" visual language — no glows, gradients, bento grids, or sparkle icons — and avoids a dark hacker-terminal look in favor of a sophisticated, minimalist, paper-toned workspace:
 
 - **Palette** — soft warm-beige/grey surfaces (`#F7F7F5` paper → `#EBEBE6` panel → `#FCFCFB` card), dark charcoal text (`#2A2A2A` ink, never pure black), and subtle `#D1D1CD`/`#BFBFBA` borders. All tokens are defined once in the `@theme` block of [`src/index.css`](src/index.css).
-- **Functional color only** — color exists solely to encode cyclomatic complexity: sage green (`#7E8F68`, low) → dusty mustard (`#B08D3E`, medium) → terracotta (`#B05B41`, high), computed as a continuous ramp by `complexityColor()` in `lib/colors.ts`. Chrome, buttons, and panel backgrounds stay neutral. Blame-gutter and author-avatar colors are the one exception (identity is data, so they stay tinted, with desaturated tones appropriate to a light background).
+- **Functional color only** — color exists solely to encode cyclomatic complexity on a clearly visible (but non-neon) traffic-light ramp: green (`#2F9E44`, low) → amber (`#DDA01F`, medium) → red (`#D23F34`, high), computed as a continuous ramp by `complexityColor()` in `lib/colors.ts`. Chrome, buttons, and panel backgrounds stay neutral. Blame-gutter and author-avatar colors are the one exception (identity is data, so they stay tinted, with desaturated tones appropriate to a light background).
 - **Flat, near-shadowless** — no glow, no blur, no heavy elevation. The one permitted shadow is `shadow-card` = `0 1px 2px rgba(0,0,0,0.05)`, used sparingly on floating panels.
 - **Typography** — Inter (sans-serif) for all UI text; JetBrains Mono is reserved exclusively for actual code (Monaco panes, inline code chips, code blocks in chat) — never used for labels, metrics, or paths.
 - **Motion** — organic, non-bouncy easing (`ease: [0.25, 0.1, 0.25, 1]` or `easeOut`), 200–320ms. No spring physics, no overshoot.
@@ -125,8 +138,8 @@ A pannable/zoomable force-directed canvas rendering a **capped subset of at most
 
 - **Subset selection** — files are ranked by a blend of dependency degree (how many edges touch them, in either direction) and modification recency (a 90-day recency window, weighted), then the top 12 are kept along with only the edges connecting them. This keeps the graph focused on the modules that are both structurally central and actively changing.
 - **Node size** encodes cyclomatic complexity (`nodeRadius()` — square-root scaled so outliers don't dominate the layout).
-- **Node color** encodes complexity on a continuous ramp (`complexityColor()`): sage → dusty mustard → terracotta as complexity rises.
-- Files whose refactor has been **applied and staged** (see [Impact analysis](#5-impact-analysis)) render in sage with a dashed ring, independent of their complexity color.
+- **Node color** encodes complexity on a continuous ramp (`complexityColor()`): green → amber → red as complexity rises.
+- Files whose refactor has been **applied and staged** (see [Impact analysis](#5-impact-analysis)) render in green with a dashed ring, independent of their complexity color.
 - **Filter toolbar** at the top accepts a small query grammar (below) that dims every non-matching node and link within the shown subset, preserving spatial context rather than removing nodes.
 - **Status bar** at the bottom shows a complexity legend, a size legend, and either a match count while filtering or "top 12 of 56 files · by connectivity & recency".
 - Clicking a node writes `selectedFileId` to the global store and opens the [file side panel](#2-file-side-panel); clicking empty canvas closes it. With ≤12 nodes on screen, filename labels render always-on rather than only on hover/zoom.
@@ -137,35 +150,35 @@ A pannable/zoomable force-directed canvas rendering a **capped subset of at most
 
 A slide-in panel (anchored left, organic ease-out slide) shown when a node is selected:
 
-- **Metadata header** — file identity (name, full path), a complexity badge, and **commit-metric sparklines**: a minimalist inline SVG polyline (no axes, no gridlines) for per-commit size (average lines changed) and commit frequency (commits/week over the last 12 weeks), computed by `commitSizes()`/`commitFrequency()` in `data/insights.ts`. Below the sparklines, a compact stat row shows total lines, total commits, and 90-day churn.
-- **Legacy code explanation** — a markdown write-up generated per file by `legacyExplanation()` in `data/insights.ts` (what the file does, how its three functions work, why it looks the way it does — grounded in its oldest/newest merged PRs and primary owner — and a short risk-notes list), rendered to HTML via **marked** and styled through the `.prose-min` CSS class in `index.css`.
-- **Previous refactors** — a vertical timeline (`refactorTimeline()` in `data/insights.ts`) merging the file's merged pull requests with any commits whose message looks refactor-shaped (`refactor:`/`perf:`/`chore:` prefixes), sorted newest-first, each entry showing author, relative time, and a one-line detail.
+- **Metadata header** — file identity (name, full path), a complexity badge, commit metrics from the backend's per-file analytics (average commit size, commits per month), and a compact stat row with total lines and total commits.
+- **File summary** — a markdown write-up composed client-side (`liveExplanation()` in `FileDrawer.tsx`) from live data: the file's location, radon complexity band, author count and lead author from its commit timeline, and its first/most-recent commit dates — rendered to HTML via **marked** and styled through the `.prose-min` CSS class in `index.css`.
+- **Commit timeline** — a vertical timeline of the file's recent commits from the backend's `git log --follow` pass, newest-first, each entry showing author, date, commit subject, and short hash.
 - Two actions: **Open refactor sandbox** and **Ask assistant** (opens the blame assistant and immediately runs `explain-intent` for this file).
 
 ### 3. Blame assistant (contextual chat)
 
-**Files:** [`ChatPane.tsx`](src/components/ChatPane.tsx), [`data/ai.ts`](src/data/ai.ts)
+**Files:** [`ChatPane.tsx`](src/components/ChatPane.tsx), [`store.ts`](src/store.ts) (`askAI`), backend [`chat_service.py`](backend/app/services/chat_service.py)
 
 A collapsible right-hand pane (toggled from the TopBar or the side panel's Ask assistant button).
 
-**What it's "grounded" in:** every response is composed from the selected file's actual mock context — its synthesized source code, its per-line git-blame chunks, its merged pull request titles/descriptions, and its commit history — not a canned string. See [Mock data engine](#mock-data-engine) below for how that context is generated.
+**What it's grounded in:** every question is POSTed to `/api/v1/chat/contextual-blame` along with the selected file's path. The backend runs a real `git blame` on that file, scores each line's relevance against your question (keyword overlap over line content, commit message, and author), and answers from those records — via the Anthropic API when `ANTHROPIC_API_KEY` is configured, or a built-in deterministic analyst otherwise.
 
-**Quick actions** (pills above the input, also runnable by typing the command name):
+**Quick actions** (pills above the input) each send a purpose-built inquiry plus a typed `quickAction` tag, and the deterministic analyst shapes its reply accordingly:
 
-| Action | What it returns |
-|---|---|
-| Explain intent | Directory role, primary owner, an architectural-intent narrative synthesized from the oldest and newest merged PRs on the file, and a pointer to the specific blame chunk where behavior has drifted from that intent |
-| Find weaknesses | Four concrete, line-referenced weaknesses (unbounded cache, injection-shaped string concatenation, silent-failure defaults, uncapped retry loop) plus the highest bug-yield commit and a safe-code sketch |
-| History | Recent commit list with author, relative time, +/− line counts, and bug-linkage flags; author ownership split; most recent merged PR |
+| Action | Reply heading | What it returns |
+|---|---|---|
+| Explain intent | `Author intent` | Primary owner of the relevant line region and what the commit trail says about why the file is shaped this way |
+| Find weaknesses | `Risk review` | The commit concentrating the most change across the relevant lines (review it first), plus commits to scrutinize and the authors behind them |
+| History | `History lookup` | The isolated relevant lines, their authors, and the commits involved |
 
-Free-form questions are also grounded — e.g. asking *"Why was this function rewritten?"* pattern-matches on keywords (`test`/`coverage`, `depend`/`import`/`break`, `who`/`author`/`owner`) to route to a relevant, context-specific answer instead of a generic fallback.
+Free-form typed questions get the general `History lookup` treatment: the blame lines most relevant to your wording, with authors and commits.
 
 **UI mechanics:**
-- Responses **stream in** character-by-character (a `setInterval`-driven reveal over the message's segment list) with a soft caret, simulating token-by-token generation without a real network call.
+- Responses **stream in** character-by-character (a `setInterval`-driven reveal over the message's segment list) with a soft caret — the backend reply arrives as one markdown payload and is revealed token-style client-side.
 - **Inline code tokens** render as bordered `<code>` chips.
 - **Line-reference chips** (e.g. `L27`) are clickable — clicking one calls `jumpToLine(fileId, line)` in the store, which opens the Refactor Sandbox for that file, scrolls the legacy editor to the line, and flashes it briefly so the connection between "what the assistant said" and "the actual code" is never ambiguous.
 - **Code blocks** get a small regex-based syntax highlighter (keywords, strings, numbers, PascalCase types, function calls, comments) tuned for the mock TS/JS output — see `TOKEN_RX` in `ChatPane.tsx`.
-- A lightweight "thinking" delay (550–1200ms, randomized) precedes each response to simulate latency before streaming begins.
+- A "Reading blame context" indicator shows while the request is in flight against the backend.
 
 ### 4. Refactor Sandbox
 
@@ -187,9 +200,11 @@ A deterministic (seeded per-file) heuristic analysis of the proposed refactor, i
 
 - **Complexity delta** — a 34–62% reduction is computed from the file's actual complexity score, shown as a before/after bar pair and a percentage figure, plus the underlying lines-of-code before/after.
 - **Regression risk gauge** (low/medium/high) — driven by the number of dependent files and the file's current test coverage: ≥5 dependents or <20% coverage escalates to high; ≥2 dependents or <45% coverage is medium; otherwise low.
-- **Apply refactor & stage** button — on click, simulates a ~1.1s staging operation (`window.setTimeout`) then marks the file as refactored in the store (`applyRefactor`). This immediately updates the file's node color back in the module graph (sage fill, dashed ring) even though the sandbox view doesn't re-render the graph — state is shared globally via Zustand.
+- **Apply refactor & stage** button — on click, simulates a ~1.1s staging operation (`window.setTimeout`) then marks the file as refactored in the store (`applyRefactor`). This immediately updates the file's node color back in the module graph (green fill, dashed ring) even though the sandbox view doesn't re-render the graph — state is shared globally via Zustand.
 
 ## Mock data engine
+
+> **Retired prototype.** Nothing in the live app imports these modules anymore — the graph, side panel, sandbox, and chat are all served by the FastAPI backend. This section documents the original prototype engine, which remains in the tree under `src/data/`.
 
 **Files:** [`data/mockRepo.ts`](src/data/mockRepo.ts), [`data/codegen.ts`](src/data/codegen.ts), [`data/insights.ts`](src/data/insights.ts), [`data/ai.ts`](src/data/ai.ts)
 
@@ -220,11 +235,13 @@ For each file the engine also generates:
 
 | Slice | Fields | Purpose |
 |---|---|---|
-| Navigation | `view` (`"graph"` \| `"sandbox"`), `selectedFileId`, `drawerOpen`, `searchQuery` | Drives which workspace is mounted and what's selected/filtered in the graph |
+| Navigation | `view` (`"graph"` \| `"sandbox"`), `activeFileId`, `drawerOpen`, `searchQuery` | Drives which workspace is mounted and what's selected/filtered in the graph |
+| Repository | `files`, `edges`, `repoName`, `branch`, `repoStatus`, `repoError` | Live topology hydrated from `GET /api/v1/repository/topology` on boot |
+| Active file | `activeFileSource`, `activeModernized`, `activeAnalytics`, `refactorTimeline`, `historyStatus`, `historyError` | Per-file history from `GET /api/v1/file/history`, fetched by a store **subscription middleware** whenever `activeFileId` changes (stale responses are dropped) |
 | Chat | `chatOpen`, `messages`, `aiThinking` | Blame assistant pane visibility and conversation state |
-| Sandbox | `sandboxFileId`, `modernDrafts` (per-file editable-pane text), `refactoredIds` (applied refactors), `revealTarget` (`{ fileId, line, nonce }` for line-jump-triggered scroll+flash) | Refactor Sandbox state, kept independent from `selectedFileId` so opening the sandbox doesn't have to touch graph selection |
+| Sandbox | `sandboxFileId`, `modernDrafts` (per-file editable-pane text), `refactoredIds` (applied refactors), `revealTarget` (`{ fileId, line, nonce }` for line-jump-triggered scroll+flash) | Refactor Sandbox state, kept independent from `activeFileId` so opening the sandbox doesn't have to touch graph selection |
 
-Key actions: `selectFile`, `openSandbox`, `askAI` (posts a user message, then after a simulated delay pushes a streaming AI message via `composeResponse`), `applyRefactor`, `jumpToLine` (cross-cuts chat → sandbox navigation).
+Key actions: `loadRepository`, `selectFile`, `openSandbox`, `askAI` (posts the question — and the `quickAction` tag for pill clicks — to the backend's contextual-blame endpoint, then pushes the streamed reply), `applyRefactor`, `jumpToLine` (cross-cuts chat → sandbox navigation).
 
 ## Data model reference
 
@@ -264,15 +281,15 @@ Example: `.ts author:pnair` → TypeScript files, among those currently shown, t
 ## Known limitations
 
 - **Monaco loads from a CDN** at runtime via the default `@monaco-editor/react` loader — the Refactor Sandbox requires internet connectivity even though the rest of the app is fully offline-capable. Self-hosting the Monaco assets would remove this dependency if needed.
-- **No persistence** — refresh the page and all state resets (selected file, chat history, staged refactors, sandbox edits). The mock repo itself regenerates identically (seeded), but session state (Zustand) is in-memory only.
+- **No persistence** — refresh the page and all state resets (selected file, chat history, staged refactors, sandbox edits). Repository data is re-fetched from the backend, but session state (Zustand) is in-memory only.
 - **`@supabase/supabase-js` and `src/supabaseClient.js`** are present but unused — a real backend integration (persisting refactors, real git history ingestion, a real LLM call for the assistant) is not wired up.
 - **Bundle size** — the production build currently emits a single ~620KB JS chunk (react-force-graph + Framer Motion + Monaco types + marked dominate). `vite build` warns about this; code-splitting the Sandbox route behind `React.lazy` would address it if it becomes a concern.
 - **The graph subset is recomputed once per mount**, not live — it does not re-rank as you interact with the app (e.g., staging a refactor doesn't change which 12 files are shown).
-- The AI assistant is **not a real model call** — it's a context-grounded template composer (`data/ai.ts`). It's designed to demonstrate the *product interaction* (grounded, line-referenced, streaming answers) rather than to generate genuinely novel analysis.
+- The AI assistant **defaults to a deterministic analyst** — without `ANTHROPIC_API_KEY` set on the backend, replies are template-composed from real `git blame` data (per-action headings: *Author intent*, *Risk review*, *History lookup*) rather than generated by a model. Setting the key upgrades all replies to real LLM answers grounded in the same blame records.
 
 ## Extending the app
 
-- **Swap in a real repo:** replace `data/mockRepo.ts`'s generator with real `git log`/`git blame` ingestion (e.g., via `isomorphic-git` or a backend endpoint) while keeping the `RepoFile`/`Commit`/`PullRequest`/`BlameChunk` shapes in `types.ts` — the rest of the app (graph, side panel, sandbox, blame gutter) consumes those types directly and shouldn't need to change.
-- **Swap in a real AI backend:** replace `composeResponse()` in `data/ai.ts` with an actual API call that streams `ChatSegment[]`-shaped output (or adapt `ChatPane.tsx`'s streaming logic to consume a real SSE/token stream instead of the character-count simulation).
-- **Adjust the graph cap:** `graphSubset(max)` in `mockRepo.ts` takes the node count as a parameter (`GraphView.tsx` currently calls it with `MAX_NODES = 12`); raising or lowering it, or changing the connectivity/recency weighting, is a single-function change.
+- **Analyze a different repo:** set `TARGET_REPO_PATH` on the backend to the absolute path of any local git repository — no frontend changes needed.
+- **Upgrade the assistant to a real LLM:** set `ANTHROPIC_API_KEY` (and `pip install anthropic`) for the backend; `chat_service.py` switches from the deterministic analyst to Anthropic-generated answers automatically, grounded in the same blame records.
+- **True token streaming:** the backend returns each chat reply as one payload and the UI reveals it client-side; adapting `ChatPane.tsx`'s streaming logic to consume a real SSE/token stream is the natural next step.
 - **Add persistence:** the Supabase client is already a dependency; the natural extension point is persisting `refactoredIds` and `modernDrafts` from the Zustand store.
