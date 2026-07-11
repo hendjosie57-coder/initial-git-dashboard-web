@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { TopBar } from "./components/TopBar";
 import { GraphView } from "./components/GraphView";
@@ -8,6 +9,12 @@ import { useDashboard } from "./store";
 export default function App() {
   const view = useDashboard((s) => s.view);
   const chatOpen = useDashboard((s) => s.chatOpen);
+  const loadRepository = useDashboard((s) => s.loadRepository);
+
+  // Hydrate the canvas pipeline from the analysis engine on boot.
+  useEffect(() => {
+    void loadRepository();
+  }, [loadRepository]);
 
   return (
     <div className="flex h-full flex-col bg-paper text-ink">

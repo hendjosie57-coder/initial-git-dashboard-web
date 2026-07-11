@@ -1,30 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import type { GraphSubset } from "../data/mockRepo";
 import { useDashboard } from "../store";
 import { complexityColor, hexToRgba, nodeRadius, SAGE } from "../lib/colors";
-import type { RepoFile } from "../types";
+import type { DepEdge, LiveFile } from "../types";
 
 /* ---------------------------------------------------------------------------
-   Force-directed module map, capped to the top 10–12 files.
+   Force-directed module map over the live repository topology.
 
-   Node size  → cyclomatic complexity
+   Node size  → cyclomatic complexity (computed by radon on the backend)
    Node color → complexity ramp (sage → dusty mustard → terracotta)
-   Click      → selects the file in the global store
+   Click      → dispatches activeFileId to the global store, which triggers
+                the file-history fetch middleware
 --------------------------------------------------------------------------- */
 
 interface GraphNode {
   id: string;
-  file: RepoFile;
+  file: LiveFile;
   x?: number;
   y?: number;
 }
 
 export function NodeGraph({
-  subset,
+  files,
+  edges,
   matchedIds,
 }: {
-  subset: GraphSubset;
+  files: LiveFile[];
+  edges: DepEdge[];
   matchedIds: Set<string> | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,17 +35,17 @@ export function NodeGraph({
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [hoverId, setHoverId] = useState<string | null>(null);
 
-  const selectedFileId = useDashboard((s) => s.selectedFileId);
+  const activeFileId = useDashboard((s) => s.activeFileId);
   const selectFile = useDashboard((s) => s.selectFile);
   const refactoredIds = useDashboard((s) => s.refactoredIds);
 
-  // The force engine mutates node/link objects; build them once per mount.
+  // The force engine mutates node/link objects; rebuild only when data changes.
   const graphData = useMemo(
     () => ({
-      nodes: subset.files.map((file): GraphNode => ({ id: file.id, file })),
-      links: subset.edges.map((e) => ({ source: e.source, target: e.target })),
+      nodes: files.map((file): GraphNode => ({ id: file.id, file })),
+      links: edges.map((e) => ({ source: e.source, target: e.target })),
     }),
-    [subset],
+    [files, edges],
   );
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export function NodeGraph({
       const refactored = refactoredIds.includes(file.id);
       const dimmed = isDimmed(file.id);
       const hovered = hoverId === file.id;
-      const selected = selectedFileId === file.id;
+      const selected = activeFileId === file.id;
       const r = nodeRadius(file);
       const color = refactored ? SAGE : complexityColor(file.complexity);
 
@@ -132,7 +134,7 @@ export function NodeGraph({
 
       ctx.restore();
     },
-    [hoverId, selectedFileId, refactoredIds, isDimmed],
+    [hoverId, activeFileId, refactoredIds, isDimmed],
   );
 
   const paintPointerArea = useCallback(

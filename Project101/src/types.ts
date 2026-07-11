@@ -76,6 +76,25 @@ export interface DepEdge {
   target: string;
 }
 
+/**
+ * A file node hydrated from the live analysis backend
+ * (GET /api/v1/repository/topology). Lighter than the mock RepoFile —
+ * only what the backend can actually derive from git + static analysis.
+ */
+export interface LiveFile {
+  /** Repo-relative path — the canonical node id shared with the backend. */
+  id: string;
+  path: string;
+  name: string;
+  dir: string;
+  ext: string;
+  /** Monaco language id derived from the extension. */
+  monacoLang: string;
+  loc: number;
+  complexity: number;
+  totalCommits: number;
+}
+
 export interface Repo {
   name: string;
   branch: string;

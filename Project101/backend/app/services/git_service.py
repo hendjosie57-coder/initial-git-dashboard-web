@@ -73,6 +73,14 @@ async def run_git(*args: str) -> str:
     return await asyncio.to_thread(_run_git_sync, list(args))
 
 
+async def current_branch() -> str:
+    """Name of the checked-out branch (or 'HEAD' when detached)."""
+    try:
+        return (await run_git("rev-parse", "--abbrev-ref", "HEAD")).strip()
+    except GitCommandError:
+        return "HEAD"
+
+
 # --- Path safety ----------------------------------------------------------------
 
 

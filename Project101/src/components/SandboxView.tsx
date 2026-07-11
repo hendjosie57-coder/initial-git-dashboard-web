@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
 import { ArrowLeft, GitCompareArrows, Lock, PencilLine } from "lucide-react";
 import { useDashboard } from "../store";
-import { authorById, fileById, relativeTime } from "../data/mockRepo";
-import { getFileCode } from "../data/codegen";
 import { ImpactReport } from "./ImpactReport";
 import { ComplexityBadge, SkeletonLines } from "./ui";
 
 /* ---------------------------------------------------------------------------
-   Refactor Sandbox — legacy code and its modernized transformation side by
-   side, plus a slim automated analysis column:
-     1. legacy source, read-only Monaco with a git-blame gutter
-     2. modernized source, editable Monaco
+   Refactor Sandbox — the split-pane workbench, fed by
+   GET /api/v1/file/history:
+     1. rawLegacyString    → left, read-only Monaco model
+     2. modernizedString   → right, editable comparison viewport
      3. impact analysis (complexity delta + regression risk)
 --------------------------------------------------------------------------- */
 
@@ -95,23 +93,17 @@ export function SandboxView() {
   const modernDrafts = useDashboard((s) => s.modernDrafts);
   const setModernDraft = useDashboard((s) => s.setModernDraft);
   const revealTarget = useDashboard((s) => s.revealTarget);
-
-  const file = fileById(sandboxFileId);
-  const code = useMemo(() => (file ? getFileCode(file) : null), [file]);
+  const file = useDashboard((s) =>
+    s.sandboxFileId ? (s.files.find((f) => f.id === s.sandboxFileId) ?? null) : null,
+  );
+  const legacySource = useDashboard((s) => s.activeFileSource);
+  const modernized = useDashboard((s) => s.activeModernized);
+  const historyStatus = useDashboard((s) => s.historyStatus);
+  const historyError = useDashboard((s) => s.historyError);
 
   const legacyRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const [legacyReady, setLegacyReady] = useState(false);
-
-  // Per-line blame lookup for the custom gutter.
-  const lineBlame = useMemo(() => {
-    if (!code) return [];
-    const arr: (typeof code.blame)[number][] = [];
-    for (const chunk of code.blame) {
-      for (let l = chunk.startLine; l <= chunk.endLine; l++) arr[l] = chunk;
-    }
-    return arr;
-  }, [code]);
 
   const handleLegacyMount = (
     editor: MonacoEditor.IStandaloneCodeEditor,
@@ -119,23 +111,6 @@ export function SandboxView() {
   ) => {
     legacyRef.current = editor;
     monacoRef.current = monaco;
-    if (code && file) {
-      editor.createDecorationsCollection(
-        code.blame.map((chunk) => {
-          const author = authorById(chunk.authorId);
-          return {
-            range: new monaco.Range(chunk.startLine, 1, chunk.endLine, 1),
-            options: {
-              isWholeLine: true,
-              linesDecorationsClassName: `blame-bar-${author.colorIndex}`,
-              hoverMessage: {
-                value: `**${author.name}** · \`${chunk.commitHash.slice(0, 7)}\` · ${relativeTime(chunk.date)}`,
-              },
-            },
-          };
-        }),
-      );
-    }
     setLegacyReady(true);
   };
 
@@ -158,7 +133,7 @@ export function SandboxView() {
     return () => window.clearTimeout(timer);
   }, [revealTarget, legacyReady, file]);
 
-  if (!file || !code) {
+  if (!file) {
     return (
       <div className="flex h-full items-center justify-center bg-paper">
         <div className="text-center">
@@ -174,7 +149,8 @@ export function SandboxView() {
     );
   }
 
-  const draft = modernDrafts[file.id] ?? code.modern;
+  const loading = historyStatus === "loading" || historyStatus === "idle";
+  const draft = modernDrafts[file.id] ?? modernized ?? "";
 
   return (
     <div className="flex h-full flex-col bg-paper">
@@ -191,7 +167,7 @@ export function SandboxView() {
           <ComplexityBadge value={file.complexity} />
         </div>
         <div className="text-[11px] text-faint">
-          {file.churn} commits / 90d · {file.loc.toLocaleString()} lines
+          {file.totalCommits} commits · {file.loc.toLocaleString()} lines
         </div>
       </div>
 
@@ -202,28 +178,26 @@ export function SandboxView() {
           <ColumnHeader
             icon={<Lock size={12} />}
             title="Legacy source"
-            hint="read-only · blame gutter"
+            hint="read-only · from git working tree"
           />
           <div className="min-h-0 flex-1">
-            <Editor
-              language="javascript"
-              value={code.legacy}
-              theme="gitdash-light"
-              beforeMount={defineTheme}
-              onMount={handleLegacyMount}
-              loading={<EditorSkeleton />}
-              options={{
-                ...BASE_OPTIONS,
-                readOnly: true,
-                lineNumbersMinChars: 20,
-                lineNumbers: (n: number) => {
-                  const chunk = lineBlame[n];
-                  if (!chunk) return String(n);
-                  const author = authorById(chunk.authorId);
-                  return `${chunk.commitHash.slice(0, 7)} ${author.handle.padEnd(8, " ")} ${String(n).padStart(3, " ")}`;
-                },
-              }}
-            />
+            {loading ? (
+              <EditorSkeleton />
+            ) : historyStatus === "error" ? (
+              <div className="p-4 text-[12px] text-muted">
+                Could not load source: {historyError}
+              </div>
+            ) : (
+              <Editor
+                language={file.monacoLang}
+                value={legacySource ?? ""}
+                theme="gitdash-light"
+                beforeMount={defineTheme}
+                onMount={handleLegacyMount}
+                loading={<EditorSkeleton />}
+                options={{ ...BASE_OPTIONS, readOnly: true, lineNumbersMinChars: 4 }}
+              />
+            )}
           </div>
         </div>
 
@@ -232,18 +206,22 @@ export function SandboxView() {
           <ColumnHeader
             icon={<PencilLine size={12} />}
             title="Modernized"
-            hint="editable · suggested rewrite"
+            hint="editable · modernizer preview"
           />
           <div className="min-h-0 flex-1">
-            <Editor
-              language="typescript"
-              value={draft}
-              theme="gitdash-light"
-              beforeMount={defineTheme}
-              loading={<EditorSkeleton />}
-              onChange={(value) => setModernDraft(file.id, value ?? "")}
-              options={{ ...BASE_OPTIONS, lineNumbersMinChars: 4 }}
-            />
+            {loading ? (
+              <EditorSkeleton />
+            ) : (
+              <Editor
+                language={file.monacoLang}
+                value={draft}
+                theme="gitdash-light"
+                beforeMount={defineTheme}
+                loading={<EditorSkeleton />}
+                onChange={(value) => setModernDraft(file.id, value ?? "")}
+                options={{ ...BASE_OPTIONS, lineNumbersMinChars: 4 }}
+              />
+            )}
           </div>
         </div>
 
@@ -252,7 +230,7 @@ export function SandboxView() {
           <ColumnHeader
             icon={<GitCompareArrows size={12} />}
             title="Analysis"
-            hint="static + blame heuristics"
+            hint="static + git heuristics"
           />
           <div className="min-h-0 flex-1">
             <ImpactReport file={file} />

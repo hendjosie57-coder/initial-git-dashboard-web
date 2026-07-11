@@ -1,11 +1,7 @@
-"""Entrypoint for the Git Codebase Analysis Dashboard data engine.
-
-Run directly (`python main.py`) or via uvicorn (`uvicorn main:app --reload`).
-"""
-
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -14,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app import config
 from app.routers import chat, graph, history
+from app.services import git_service
 from app.services.git_service import (
     FileNotFoundInRepoError,
     GitBinaryMissingError,
@@ -22,15 +19,25 @@ from app.services.git_service import (
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logger = logging.getLogger("bootstrap")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Ingestion guard: refuse to serve against anything that is not a git repo.
+    config.validate_target_repository()
+    logger.info("target repository validated: %s", config.REPO_ROOT)
+    yield
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title="Git Codebase Analysis Dashboard API",
     description="Automated data engine: git history, radon complexity metrics, "
     "dependency graph, and contextual blame chat.",
     version="1.0.0",
 )
 
-# CORS wide open for local development (Vite dev server, previews, etc.).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,10 +48,6 @@ app.add_middleware(
 app.include_router(graph.router)
 app.include_router(history.router)
 app.include_router(chat.router)
-
-
-# --- Error protection: domain exceptions → meaningful JSON responses -----------
-
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": code, "detail": message})
@@ -75,9 +78,13 @@ async def health() -> dict[str, object]:
     return {
         "status": "ok",
         "repository": str(config.REPO_ROOT),
+        "repositoryName": config.REPO_ROOT.name,
+        "branch": await git_service.current_branch(),
         "llmEnabled": bool(config.ANTHROPIC_API_KEY),
     }
 
 
 if __name__ == "__main__":
+    # Fail fast with a readable error instead of a mid-startup traceback.
+    config.validate_target_repository()
     uvicorn.run("main:app", host=config.HOST, port=config.PORT, reload=True)

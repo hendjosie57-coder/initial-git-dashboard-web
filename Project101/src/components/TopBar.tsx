@@ -1,11 +1,7 @@
 import { GitBranch, MessageSquareText, Network, SplitSquareHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { useDashboard } from "../store";
-import { REPO } from "../data/mockRepo";
 import { TERRACOTTA } from "../lib/colors";
-import { AvatarStack } from "./ui";
-
-const HIGH_COMPLEXITY = REPO.files.filter((f) => f.complexity >= 55).length;
 
 export function TopBar() {
   const view = useDashboard((s) => s.view);
@@ -13,6 +9,11 @@ export function TopBar() {
   const chatOpen = useDashboard((s) => s.chatOpen);
   const toggleChat = useDashboard((s) => s.toggleChat);
   const sandboxFileId = useDashboard((s) => s.sandboxFileId);
+  const repoName = useDashboard((s) => s.repoName);
+  const branch = useDashboard((s) => s.branch);
+  const highComplexity = useDashboard(
+    (s) => s.files.filter((f) => f.complexity >= 55).length,
+  );
 
   return (
     <header className="z-30 flex h-12 shrink-0 items-center justify-between border-b border-edge bg-card px-4">
@@ -22,19 +23,19 @@ export function TopBar() {
           <span className="text-[13px] font-semibold tracking-tight text-ink">
             Git Dashboard
           </span>
-          <span className="text-[11px] text-faint">{REPO.name}</span>
+          <span className="text-[11px] text-faint">{repoName || "connecting…"}</span>
         </div>
 
         <div className="hidden h-4 w-px bg-edge md:block" />
 
         <div className="hidden items-center gap-1.5 rounded-md border border-edge bg-paper px-2 py-0.5 md:flex">
           <GitBranch size={11} className="text-muted" />
-          <span className="text-[11px] text-muted">{REPO.branch}</span>
+          <span className="text-[11px] text-muted">{branch || "—"}</span>
         </div>
 
         <span className="hidden items-center gap-1.5 text-[11px] text-muted lg:flex">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: TERRACOTTA }} />
-          {HIGH_COMPLEXITY} high-complexity files
+          {highComplexity} high-complexity files
         </span>
       </div>
 
@@ -78,7 +79,6 @@ export function TopBar() {
 
       {/* Right controls */}
       <div className="flex items-center gap-3">
-        <AvatarStack authors={REPO.authors.slice(0, 5)} />
         <button
           onClick={toggleChat}
           className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] font-medium transition-colors duration-200 ${

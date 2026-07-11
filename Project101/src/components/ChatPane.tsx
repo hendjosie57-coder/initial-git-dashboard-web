@@ -8,26 +8,15 @@ import {
   type ReactNode,
 } from "react";
 import { CornerDownLeft, Eraser, MessageSquareText } from "lucide-react";
-import { useDashboard } from "../store";
-import { fileById } from "../data/mockRepo";
-import { segmentsLength, sliceSegments } from "../data/ai";
+import { selectActiveFile, useDashboard } from "../store";
+import { segmentsLength, sliceSegments } from "../lib/segments";
 import type { ChatMessage, QuickAction } from "../types";
-
-/* ---------------------------------------------------------------------------
-   Blame assistant — context-aware chat over the selected file.
-
-   The assistant's responses are grounded in the file's source, git blame,
-   merged PRs, and commit history (see data/ai.ts). Answers stream in with
-   a quiet caret; line references are clickable and jump the sandbox editor.
---------------------------------------------------------------------------- */
 
 const QUICK_ACTIONS: Array<{ id: QuickAction; label: string }> = [
   { id: "explain-intent", label: "Explain intent" },
   { id: "find-weaknesses", label: "Find weaknesses" },
   { id: "history", label: "History" },
 ];
-
-/* --- Tiny syntax highlighter (chat code blocks only) ------------------------ */
 
 const TOKEN_RX =
   /(\/\/.*$)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|\b(const|let|var|function|return|if|else|await|async|export|import|from|interface|type|new|for|while|typeof|null|undefined|true|false|of|in|class|extends)\b|\b(\d+(?:\.\d+)?)\b|\b([A-Z][A-Za-z0-9_]*)\b|([a-zA-Z_$][\w$]*)(?=\()/gm;
@@ -142,12 +131,11 @@ function MessageView({ message, onTick }: { message: ChatMessage; onTick: () => 
 /* --- Pane --------------------------------------------------------------------- */
 
 export function ChatPane() {
-  const selectedFileId = useDashboard((s) => s.selectedFileId);
   const messages = useDashboard((s) => s.messages);
   const aiThinking = useDashboard((s) => s.aiThinking);
   const askAI = useDashboard((s) => s.askAI);
   const clearChat = useDashboard((s) => s.clearChat);
-  const file = fileById(selectedFileId);
+  const file = useDashboard(selectActiveFile);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -193,7 +181,7 @@ export function ChatPane() {
               <>
                 <p>
                   Context loaded for <span className="font-medium text-muted">{file.name}</span>:
-                  source, git blame, merged PRs, and commit history.
+                  live git blame and commit history from the analysis engine.
                 </p>
                 <p className="mt-1.5">
                   Ask something like <em>“Why was this function rewritten?”</em> or use a quick

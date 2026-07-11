@@ -51,7 +51,8 @@ def _build_nodes_and_links(commit_counts: dict[str, int]) -> GraphResponse:
     return GraphResponse(nodes=nodes, links=links)
 
 
-@router.get("/graph", response_model=GraphResponse)
+@router.get("/repository/topology", response_model=GraphResponse)
+@router.get("/graph", response_model=GraphResponse, deprecated=True)
 async def get_codebase_graph() -> GraphResponse:
     commit_counts = await git_service.count_commits_per_file()
     # File scanning + parsing is CPU/disk bound: keep it off the event loop.

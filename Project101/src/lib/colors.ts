@@ -1,4 +1,4 @@
-import type { RepoFile, Risk } from "../types";
+import type { Risk } from "../types";
 
 /* Node color rule: cyclomatic complexity mapped onto a muted, non-neon ramp —
    sage green (low) → dusty mustard (mid) → terracotta (high). */
@@ -54,7 +54,7 @@ export function riskOf(complexityNorm: number, churnNorm: number): Risk {
 }
 
 /** Node radius from complexity (area-ish scaling so big files don't explode). */
-export function nodeRadius(file: RepoFile): number {
+export function nodeRadius(file: { complexity: number }): number {
   return 4 + Math.sqrt(file.complexity) * 1.1;
 }
 

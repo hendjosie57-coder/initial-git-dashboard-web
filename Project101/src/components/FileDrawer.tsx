@@ -1,96 +1,129 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { marked } from "marked";
-import { FileCode2, GitCommitHorizontal, GitPullRequest, MessageSquareText, SplitSquareHorizontal, X } from "lucide-react";
+import { FileCode2, GitCommitHorizontal, MessageSquareText, SplitSquareHorizontal, X } from "lucide-react";
 import { useDashboard } from "../store";
-import { authorById, relativeTime } from "../data/mockRepo";
-import { commitFrequency, commitSizes, legacyExplanation, refactorTimeline } from "../data/insights";
-import type { RepoFile } from "../types";
-import { ComplexityBadge, SectionLabel, Sparkline, Stat } from "./ui";
+import type { TimelineEntry } from "../lib/api";
+import { complexityBand } from "../lib/colors";
+import type { LiveFile } from "../types";
+import { ComplexityBadge, SectionLabel, SkeletonLines, Sparkline, Stat } from "./ui";
 
 /* ---------------------------------------------------------------------------
-   File side panel. Listens to the selected node and shows:
-     · metadata header with minimalist commit-metric sparklines
-     · a human-readable markdown explanation of the legacy code
-     · a "previous refactors" timeline reconstructed from git history
+   File side panel, fed by GET /api/v1/file/history (fetched automatically by
+   the store middleware whenever activeFileId changes):
+     · metadata header with live commit-metric sparklines
+     · a markdown summary synthesized from the file's real git analytics
+     · the refactor timeline parsed from `git log --follow`
 --------------------------------------------------------------------------- */
 
 const EASE = [0.25, 0.1, 0.25, 1] as const;
 
-function CommitMetrics({ file }: { file: RepoFile }) {
-  const sizes = useMemo(() => commitSizes(file), [file]);
-  const freq = useMemo(() => commitFrequency(file), [file]);
-  const avgSize = Math.round(sizes.reduce((a, b) => a + b, 0) / Math.max(1, sizes.length));
-  const perWeek = (file.churn / 13).toFixed(1);
+/** Commits per month over the last `months` months, oldest → newest. */
+function monthlyCommitBins(timeline: TimelineEntry[], months = 12): number[] {
+  const bins = new Array<number>(months).fill(0);
+  const now = Date.now();
+  for (const entry of timeline) {
+    const age = Math.floor((now - new Date(entry.dateString).getTime()) / (30.44 * 86_400_000));
+    if (age >= 0 && age < months) bins[months - 1 - age]++;
+  }
+  return bins;
+}
+
+function CommitMetrics({ file }: { file: LiveFile }) {
+  const analytics = useDashboard((s) => s.activeAnalytics);
+  const timeline = useDashboard((s) => s.refactorTimeline);
+  const bins = useMemo(() => monthlyCommitBins(timeline), [timeline]);
   return (
     <div className="flex items-center gap-5">
       <div className="flex items-center gap-2">
         <div>
           <div className="text-[10px] text-faint">Commit size</div>
-          <div className="text-[11px] font-medium text-muted">~{avgSize} lines</div>
+          <div className="text-[11px] font-medium text-muted">
+            ~{analytics?.averageCommitSizeLines ?? 0} lines
+          </div>
         </div>
-        <Sparkline values={sizes} />
       </div>
       <div className="flex items-center gap-2">
         <div>
           <div className="text-[10px] text-faint">Frequency</div>
-          <div className="text-[11px] font-medium text-muted">{perWeek}/wk</div>
+          <div className="text-[11px] font-medium text-muted">
+            {(analytics?.commitFrequencyPerMonth ?? file.totalCommits).toFixed(1)}/mo
+          </div>
         </div>
-        <Sparkline values={freq} />
+        <Sparkline values={bins} />
       </div>
     </div>
   );
 }
 
-function RefactorTimeline({ file }: { file: RepoFile }) {
-  const events = useMemo(() => refactorTimeline(file), [file]);
+/** Markdown explanation grounded in the file's real git analytics. */
+function liveExplanation(file: LiveFile, timeline: TimelineEntry[]): string {
+  const authors = new Map<string, number>();
+  for (const e of timeline) authors.set(e.author, (authors.get(e.author) ?? 0) + 1);
+  const ranked = [...authors.entries()].sort((a, b) => b[1] - a[1]);
+  const authorNote = ranked.length
+    ? `Its history involves ${ranked.length} author${ranked.length === 1 ? "" : "s"}, led by **${
+        ranked[0][0]
+      }** (${ranked[0][1]} of ${timeline.length} commits).`
+    : "No commit history is recorded for it yet.";
+  const span = timeline.length
+    ? `First recorded commit ${timeline[0].dateString}, most recent ${
+        timeline[timeline.length - 1].dateString
+      }.`
+    : "";
+  const band = complexityBand(file.complexity);
+
+  return `### What this file is
+
+\`${file.name}\` lives in \`${file.dir}\` — ${file.loc.toLocaleString()} lines with a **${band}** cyclomatic complexity score of ${file.complexity} (radon static analysis).
+
+### What its history says
+
+${authorNote} ${span}
+
+Recent commit subjects are listed in the timeline below; ask the blame assistant for a line-level answer to *why* any of them happened.`;
+}
+
+function RefactorTimeline() {
+  const timeline = useDashboard((s) => s.refactorTimeline);
+  const events = useMemo(() => [...timeline].reverse().slice(0, 6), [timeline]);
   if (events.length === 0) {
-    return <p className="text-[12px] text-faint">No prior refactors on record.</p>;
+    return <p className="text-[12px] text-faint">No commit history on record.</p>;
   }
   return (
     <div className="relative ml-1.5 border-l border-edge pl-4">
-      {events.map((ev) => {
-        const author = authorById(ev.authorId);
-        return (
-          <div key={ev.id} className="relative pb-4 last:pb-0">
-            <span
-              className={`absolute -left-[21.5px] top-1 flex h-3 w-3 items-center justify-center rounded-full border bg-card ${
-                ev.kind === "pr" ? "border-sage" : "border-edge-2"
-              }`}
-            >
-              <span
-                className={`h-1 w-1 rounded-full ${ev.kind === "pr" ? "bg-sage" : "bg-edge-2"}`}
-              />
-            </span>
-            <div className="flex items-center gap-1.5 text-[10px] text-faint">
-              {ev.kind === "pr" ? (
-                <GitPullRequest size={10} />
-              ) : (
-                <GitCommitHorizontal size={10} />
-              )}
-              {author.name} · {relativeTime(ev.date)}
-            </div>
-            <div className="mt-0.5 text-[12px] font-medium leading-snug text-ink">
-              {ev.title}
-            </div>
-            <div className="text-[11px] leading-relaxed text-muted">{ev.detail}</div>
+      {events.map((ev) => (
+        <div key={ev.commitHash} className="relative pb-4 last:pb-0">
+          <span className="absolute -left-[21.5px] top-1 flex h-3 w-3 items-center justify-center rounded-full border border-edge-2 bg-card">
+            <span className="h-1 w-1 rounded-full bg-edge-2" />
+          </span>
+          <div className="flex items-center gap-1.5 text-[10px] text-faint">
+            <GitCommitHorizontal size={10} />
+            {ev.author} · {ev.dateString}
           </div>
-        );
-      })}
+          <div className="mt-0.5 text-[12px] font-medium leading-snug text-ink">
+            {ev.summary || "(no message)"}
+          </div>
+          <div className="font-mono text-[10px] text-faint">{ev.commitHash.slice(0, 10)}</div>
+        </div>
+      ))}
     </div>
   );
 }
 
-export function FileDrawer({ file }: { file: RepoFile }) {
+export function FileDrawer({ file }: { file: LiveFile }) {
   const closeDrawer = useDashboard((s) => s.closeDrawer);
   const openSandbox = useDashboard((s) => s.openSandbox);
   const askAI = useDashboard((s) => s.askAI);
   const chatOpen = useDashboard((s) => s.chatOpen);
   const toggleChat = useDashboard((s) => s.toggleChat);
+  const historyStatus = useDashboard((s) => s.historyStatus);
+  const historyError = useDashboard((s) => s.historyError);
+  const timeline = useDashboard((s) => s.refactorTimeline);
 
   const explanationHtml = useMemo(
-    () => marked.parse(legacyExplanation(file), { async: false }) as string,
-    [file],
+    () => marked.parse(liveExplanation(file, timeline), { async: false }) as string,
+    [file, timeline],
   );
 
   return (
@@ -133,26 +166,35 @@ export function FileDrawer({ file }: { file: RepoFile }) {
         <div className="mt-3 flex items-center gap-4">
           <Stat label="Lines" value={file.loc.toLocaleString()} />
           <Stat label="Commits" value={file.totalCommits} />
-          <Stat label="Churn 90d" value={file.churn} />
         </div>
       </div>
 
       {/* Body */}
       <div className="flex-1 space-y-5 overflow-y-auto p-4">
-        <section>
-          <SectionLabel>Legacy code explanation</SectionLabel>
-          <div
-            className="prose-min mt-2"
-            dangerouslySetInnerHTML={{ __html: explanationHtml }}
-          />
-        </section>
+        {historyStatus === "loading" ? (
+          <SkeletonLines lines={6} />
+        ) : historyStatus === "error" ? (
+          <p className="text-[12px] leading-relaxed text-muted">
+            Could not load history: {historyError}
+          </p>
+        ) : (
+          <>
+            <section>
+              <SectionLabel>File summary</SectionLabel>
+              <div
+                className="prose-min mt-2"
+                dangerouslySetInnerHTML={{ __html: explanationHtml }}
+              />
+            </section>
 
-        <section>
-          <SectionLabel>Previous refactors</SectionLabel>
-          <div className="mt-2.5">
-            <RefactorTimeline file={file} />
-          </div>
-        </section>
+            <section>
+              <SectionLabel>Commit timeline</SectionLabel>
+              <div className="mt-2.5">
+                <RefactorTimeline />
+              </div>
+            </section>
+          </>
+        )}
       </div>
 
       {/* Actions */}

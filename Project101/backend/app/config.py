@@ -11,12 +11,14 @@ from pathlib import Path
 
 
 def _discover_repo_root() -> Path:
-    """Walk upward from this file until a directory containing `.git` is found.
+    """Resolve the repository under analysis.
 
-    The backend ships inside the repository it analyses by default, so this
-    gives a sensible zero-config default. `GIT_REPO_PATH` overrides it.
+    Priority: `TARGET_REPO_PATH` (the ingestion target), then the legacy
+    `GIT_REPO_PATH` alias, then walking upward from this file until a
+    directory containing `.git` is found (the backend ships inside the
+    repository it analyses by default).
     """
-    override = os.getenv("GIT_REPO_PATH")
+    override = os.getenv("TARGET_REPO_PATH") or os.getenv("GIT_REPO_PATH")
     if override:
         return Path(override).expanduser().resolve()
 
@@ -24,11 +26,31 @@ def _discover_repo_root() -> Path:
     for candidate in (current, *current.parents):
         if (candidate / ".git").exists():
             return candidate
-    # Last resort: current working directory (validated again at request time).
+    # Last resort: current working directory (rejected by startup validation
+    # below unless it actually is a git repository).
     return Path.cwd().resolve()
 
 
 REPO_ROOT: Path = _discover_repo_root()
+
+
+def validate_target_repository() -> None:
+    """Abort the bootstrap sequence unless REPO_ROOT is a real git repository.
+
+    Called before the FastAPI listener loop starts; raising here stops the
+    server from serving requests against a directory it cannot analyse.
+    """
+    if not REPO_ROOT.is_dir():
+        raise RuntimeError(
+            f"TARGET_REPO_PATH initialization error: {REPO_ROOT} is not a directory. "
+            "Set TARGET_REPO_PATH to the absolute path of a local git repository."
+        )
+    if not (REPO_ROOT / ".git").exists():
+        raise RuntimeError(
+            f"TARGET_REPO_PATH initialization error: {REPO_ROOT} contains no .git "
+            "directory. Point TARGET_REPO_PATH at the root of a git repository "
+            "(the folder that holds .git)."
+        )
 
 # Directories never scanned for graph nodes or dependency links.
 EXCLUDED_DIRS: frozenset[str] = frozenset(

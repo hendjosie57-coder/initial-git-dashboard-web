@@ -1,13 +1,44 @@
 import { useMemo, useState } from "react";
 import { Check, GitMerge, Loader2, ShieldAlert, TrendingDown } from "lucide-react";
-import { computeImpact } from "../data/codegen";
 import { useDashboard } from "../store";
 import { hexToRgba, RISK_COLORS, SAGE, TERRACOTTA } from "../lib/colors";
-import type { RepoFile, Risk } from "../types";
+import type { ImpactMetrics, LiveFile, Risk } from "../types";
 import { SectionLabel } from "./ui";
 
-/* Automated impact analysis for the proposed refactor: complexity delta and
-   regression risk only. Flat cards, muted functional color. */
+/* ---------------------------------------------------------------------------
+   Impact analysis for the proposed modernization, computed from live data:
+     · complexity before  — the backend's radon score for the file
+     · complexity after   — the same decision-point heuristic the backend
+                            uses, applied to the modernized pane's content
+     · regression risk    — dependents (from the topology links) + complexity
+--------------------------------------------------------------------------- */
+
+const BRANCH_RX = /\b(?:if|for|while|case|catch|elif|except)\b|&&|\|\||\?\?/g;
+
+function estimateComplexity(source: string): number {
+  if (!source.trim()) return 0;
+  return 1 + (source.match(BRANCH_RX)?.length ?? 0);
+}
+
+function liveImpact(file: LiveFile, modern: string, dependents: number): ImpactMetrics {
+  const before = Math.max(1, file.complexity);
+  const after = Math.min(before, Math.max(1, estimateComplexity(modern)));
+  const deltaPct = Math.round(((after - before) / before) * 100);
+  const regressionRisk: Risk =
+    dependents >= 5 || before >= 55
+      ? "high"
+      : dependents >= 2 || before >= 28
+        ? "medium"
+        : "low";
+  return {
+    complexityBefore: before,
+    complexityAfter: after,
+    complexityDeltaPct: deltaPct,
+    locBefore: file.loc,
+    locAfter: modern ? modern.split("\n").length : file.loc,
+    regressionRisk,
+  };
+}
 
 function DeltaMeter({
   beforeVal,
@@ -90,11 +121,19 @@ function RiskGauge({ risk }: { risk: Risk }) {
   );
 }
 
-export function ImpactReport({ file }: { file: RepoFile }) {
-  const impact = useMemo(() => computeImpact(file), [file]);
+export function ImpactReport({ file }: { file: LiveFile }) {
   const applyRefactor = useDashboard((s) => s.applyRefactor);
   const applied = useDashboard((s) => s.refactoredIds.includes(file.id));
+  const modernDraft = useDashboard((s) => s.modernDrafts[file.id]);
+  const modernized = useDashboard((s) => s.activeModernized);
+  const edges = useDashboard((s) => s.edges);
   const [staging, setStaging] = useState(false);
+
+  const impact = useMemo(() => {
+    const modern = modernDraft ?? modernized ?? "";
+    const dependents = edges.filter((e) => e.target === file.id).length;
+    return liveImpact(file, modern, dependents);
+  }, [file, modernDraft, modernized, edges]);
 
   const handleApply = () => {
     if (applied || staging) return;
