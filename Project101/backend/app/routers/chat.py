@@ -17,7 +17,7 @@ async def contextual_blame(request: ContextualBlameRequest) -> ContextualBlameRe
 
     blame = await git_service.blame_file(relative)
     context = chat_service.select_relevant_lines(blame, request.userInquiry)
-    reply = await chat_service.answer(relative, request.userInquiry, context)
+    reply = await chat_service.answer(relative, request.userInquiry, context, request.quickAction)
 
     return ContextualBlameResponse(
         replyText=reply,

@@ -1,11 +1,11 @@
 import type { Risk } from "../types";
 
-/* Node color rule: cyclomatic complexity mapped onto a muted, non-neon ramp —
-   sage green (low) → dusty mustard (mid) → terracotta (high). */
+/* Node color rule: cyclomatic complexity mapped onto a visible, non-neon
+   traffic-light ramp — green (low) → amber (mid) → red (high). */
 
-export const SAGE = "#7e8f68";
-export const MUSTARD = "#b08d3e";
-export const TERRACOTTA = "#b05b41";
+export const SAGE = "#2f9e44";
+export const MUSTARD = "#dda01f";
+export const TERRACOTTA = "#d23f34";
 
 export const RISK_COLORS: Record<Risk, string> = {
   low: SAGE,
@@ -32,7 +32,7 @@ function lerpHex(a: string, b: string, t: number): string {
   return `#${((r << 16) | (g << 8) | bl).toString(16).padStart(6, "0")}`;
 }
 
-/** Continuous complexity ramp: sage → mustard → terracotta. */
+/** Continuous complexity ramp: green → amber → red. */
 export function complexityColor(complexity: number): string {
   const t = Math.min(1, Math.max(0, complexity / COMPLEXITY_MAX));
   return t <= 0.5 ? lerpHex(SAGE, MUSTARD, t * 2) : lerpHex(MUSTARD, TERRACOTTA, (t - 0.5) * 2);

@@ -8,7 +8,7 @@ import type { DepEdge, LiveFile } from "../types";
    Force-directed module map over the live repository topology.
 
    Node size  → cyclomatic complexity (computed by radon on the backend)
-   Node color → complexity ramp (sage → dusty mustard → terracotta)
+   Node color → complexity ramp (green → amber → red)
    Click      → dispatches activeFileId to the global store, which triggers
                 the file-history fetch middleware
 --------------------------------------------------------------------------- */

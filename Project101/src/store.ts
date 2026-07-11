@@ -207,7 +207,7 @@ export const useDashboard = create<DashboardState>()(
       };
       set((s) => ({ messages: [...s.messages, userMsg], aiThinking: true }));
 
-      void postContextualBlame(fileId, inquiry)
+      void postContextualBlame(fileId, inquiry, quickAction)
         .then((res) => {
           const aiMsg: ChatMessage = {
             id: nextId(),

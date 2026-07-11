@@ -115,9 +115,10 @@ export const fetchFileHistory = (path: string): Promise<FileHistoryResponse> =>
 export const postContextualBlame = (
   targetFilePath: string,
   userInquiry: string,
+  quickAction?: string,
 ): Promise<ContextualBlameResponse> =>
   request("/api/v1/chat/contextual-blame", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ targetFilePath, userInquiry }),
+    body: JSON.stringify({ targetFilePath, userInquiry, quickAction }),
   });
